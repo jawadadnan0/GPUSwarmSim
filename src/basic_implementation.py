@@ -1,6 +1,8 @@
 import argparse
 import numpy as np
 
+from copy import deepcopy
+
 np.set_printoptions(precision=3)
 
 
@@ -31,11 +33,20 @@ def main():
 # Direction of the Motion of Particles:
 # {vel}""")
 
-    particle_map = np.zeros((int(l / rr), int(l / rr))).astype(int)
+    particle_map = np.zeros((int(l / rr), int(l / rr))).astype(np.object)
     index = index_map(pos, rr)
     particle_map = fill_map(particle_map, index)
-
     print(particle_map)
+
+    for t in range(max_iter):
+
+        particle_map_old = deepcopy(particle_map)
+        index_old = deepcopy(index)
+        pos_old = deepcopy(pos)
+        vel_old = deepcopy(vel)
+
+        jump = np.random.uniform(size=(n, 1))
+        who = jump > np.exp(-nu * dt)
 
 
 def fill_map(particle_map, index):
@@ -48,7 +59,7 @@ def fill_map(particle_map, index):
 
 
 def index_map(pos, r):
-    return np.c_[np.arange(len(pos)), np.ceil(pos / r)].astype(int)
+    return np.c_[np.arange(len(pos)), np.floor(pos / r)].astype(int)
 
 
 def parse_args():
