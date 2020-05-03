@@ -17,7 +17,7 @@ def main():
 # Concentration Parameter: {kappa}""")
 
     dt = 0.01 / nu
-    max_iter = np.floor(t / dt)
+    max_iter = np.floor(t / dt).astype(int)
     scaled_velocity = l * v
     rr = l / np.floor(l / r)
     pos = l * np.random.uniform(size=(n, 2))
@@ -33,10 +33,9 @@ def main():
 # Direction of the Motion of Particles:
 # {vel}""")
 
-    particle_map = np.zeros((int(l / rr), int(l / rr))).astype(np.object)
+    particle_map = np.full((int(l / rr), int(l / rr)), np.nan).astype(np.object)
     index = index_map(pos, rr)
     particle_map = fill_map(particle_map, index)
-    print(particle_map)
 
     for t in range(max_iter):
 
@@ -46,15 +45,21 @@ def main():
         vel_old = deepcopy(vel)
 
         jump = np.random.uniform(size=(n, 1))
-        who = jump > np.exp(-nu * dt)
+        who = np.where(jump > np.exp(-nu * dt), 1, 0)
+
+
+def average_orientation(pos, vel, index, particle_map, r):
+    pass
 
 
 def fill_map(particle_map, index):
     for i in range(len(index)):
-        if particle_map[index[i, 1], index[i, 2]] == 0:
+        print("Before: ", particle_map[index[i, 1], index[i, 2]])
+        if np.all(np.isnan(particle_map[index[i, 1], index[i, 2]])):
             particle_map[index[i, 1], index[i, 2]] = [index[i, 0]]
         else:
-            particle_map[index[i, 1], index[i, 2]] = np.c_[index[i, 0], particle_map[index[i, 1], index[i, 2]]]
+            particle_map[index[i, 1], index[i, 2]] = np.r_[index[i, 0], particle_map[index[i, 1], index[i, 2]]]
+        print("After: ", particle_map[index[i, 1], index[i, 2]])
     return particle_map
 
 
