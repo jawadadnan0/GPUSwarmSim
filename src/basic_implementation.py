@@ -21,8 +21,8 @@ def main():
     max_iter = np.floor(t / dt).astype(int)
     scaled_velocity = l * v
     rr = l / np.floor(l / r)
-    pos = l * np.random.random((n, 2))
-    vel = 2 * np.pi * np.random.random((n, 1))
+    pos = l * np.random.random(size=(n, 2))
+    vel = 2 * np.pi * np.random.random(size=(n, 1))
     scale = l / 60
 
     # print(f"""Calculated Parameters:-
@@ -47,7 +47,7 @@ def main():
         pos_old = deepcopy(pos)
         vel_old = deepcopy(vel)
 
-        jump = np.random.uniform(size=(n, 1))
+        jump = np.random.random(size=(n, 1))
         who = np.where(jump > np.exp(-nu * dt), 1, 0)
         target = vel_old
         target[np.where(who[:, 0] == 1)] = average_orientation(pos_old, vel_old,
@@ -66,13 +66,13 @@ def main():
 
 def circ_vmrnd(theta=0, kappa=1, n=10):
     if kappa < 1e-6:
-        return 2 * np.pi * np.random.random((n, 1)) - np.pi
+        return 2 * np.pi * np.random.random(size=(n, 1)) - np.pi
 
     a = 1 + np.sqrt((1 + 4 * kappa ** 2))
     b = (a - np.sqrt(2 * a)) / (2 * kappa)
     r = (1 + b ** 2) / (2 * b)
 
-    alpha = np.zeros((n, 1))
+    alpha = np.zeros(shape=(n, 1))
     for j in range(n):
         while True:
             u = np.random.random(size=3)
