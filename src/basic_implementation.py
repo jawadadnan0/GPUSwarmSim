@@ -2,6 +2,8 @@ import argparse
 import numpy as np
 
 from copy import deepcopy
+from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 np.set_printoptions(precision=4)
 
@@ -17,13 +19,34 @@ def main():
     #     Jump Rate: {nu}
     #     Concentration Parameter: {kappa}""")
 
+    fig, ax = plt.subplots(figsize=(8, 6), dpi=125)
+    ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
+                        fargs=(ax, l), interval=5)
+
+    plt.show()
+
+
+def update_quiver_frame(frame_data, ax, l):
+    ax.clear()
+    ax.set_xlim(0, l)
+    ax.set_ylim(0, l)
+
+    pos, vel = frame_data
+    scale = l / 60
+
+    q = ax.quiver(pos[:, 0].transpose(), pos[:, 1].transpose(), scale * np.cos(vel), scale * np.sin(vel))
+    ax.quiverkey(q, X=0.3, Y=1.1, U=0.05, label='Quiver key, length = 0.05', labelpos='E')
+
+
+def process_particles(n, l, t, r, v, nu, kappa):
+    random = np.random.RandomState(seed=0)
+
     dt = 0.01 / nu
     max_iter = np.floor(t / dt).astype(int)
     scaled_velocity = l * v
     rr = l / np.floor(l / r)
-    pos = l * np.random.random(size=(n, 2))
-    vel = 2 * np.pi * np.random.random(size=(n, 1))
-    scale = l / 60
+    pos = l * random.uniform(size=(n, 2))
+    vel = 2 * np.pi * random.uniform(size=(n, 1))
 
     # print(f"""Calculated Parameters:-
     #     Time Discretisation Step: {dt}
@@ -47,7 +70,7 @@ def main():
         pos_old = deepcopy(pos)
         vel_old = deepcopy(vel)
 
-        jump = np.random.random(size=(n, 1))
+        jump = random.uniform(size=(n, 1))
         who = np.where(jump > np.exp(-nu * dt), 1, 0)
         target = vel_old
         target[np.where(who[:, 0] == 1)] = average_orientation(pos_old, vel_old,
@@ -55,13 +78,14 @@ def main():
                                                                particle_map_old, r)
         vel[np.where(who[:, 0] == 1)] = np.mod(target[np.where(who[:, 0] == 1)] +
                                                circ_vmrnd(0, kappa, who.sum()), 2 * np.pi)
-        pos = np.mod(pos_old + dt * v * np.c_[np.cos(vel), np.sin(vel)], l)
+        pos = np.mod(pos_old + dt * scaled_velocity * np.c_[np.cos(vel), np.sin(vel)], l)
+
+        if t % 10 == 0:
+            yield pos, vel
 
         index = index_map(pos, rr)
         particle_map = np.full((int(l / rr), int(l / rr)), np.nan).astype(np.object)
         particle_map = fill_map(particle_map, index)
-
-        print(pos)
 
 
 def circ_vmrnd(theta=0, kappa=1, n=10):
