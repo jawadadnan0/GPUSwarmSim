@@ -3,7 +3,7 @@ import numpy as np
 
 from copy import deepcopy
 from matplotlib import pyplot as plt
-from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation, writers
 
 np.set_printoptions(precision=4)
 
@@ -19,17 +19,22 @@ def main():
     #     Jump Rate: {nu}
     #     Concentration Parameter: {kappa}""")
 
-    fig, ax = plt.subplots(figsize=(8, 6), dpi=125)
-    ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
-                        fargs=(ax, l), interval=5)
+    fig, ax = plt.subplots(dpi=200)
 
-    plt.show()
+    writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
+    ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
+                        fargs=(ax, l), interval=10, save_count=t)
+    ani.save("quiver.mp4", writer=writer)
+    # plt.show()
 
 
 def update_quiver_frame(frame_data, ax, l):
     ax.clear()
+    sep = l / 10
+    ax.set_xticks(np.arange(0, l + sep, sep))
+    ax.set_yticks(np.arange(0, l + sep, sep))
     ax.set_xlim(0, l)
-    ax.set_ylim(0, l)
+    ax.set_ylim(0, 1)
 
     pos, vel = frame_data
     scale = l / 60
