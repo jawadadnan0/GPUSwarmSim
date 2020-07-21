@@ -24,8 +24,8 @@ def main():
     writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
     ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
                         fargs=(ax, l), interval=10, save_count=t)
-    ani.save("quiver.mp4", writer=writer)
-    # plt.show()
+    # ani.save("quiver.mp4", writer=writer)
+    plt.show()
 
 
 def update_quiver_frame(frame_data, ax, l):
@@ -69,21 +69,15 @@ def process_particles(n, l, t, r, v, nu, kappa):
     particle_map = fill_map(particle_map, index)
 
     for t in range(max_iter):
-
-        particle_map_old = deepcopy(particle_map)
-        index_old = deepcopy(index)
-        pos_old = deepcopy(pos)
-        vel_old = deepcopy(vel)
-
         jump = random.uniform(size=(n, 1))
         who = np.where(jump > np.exp(-nu * dt), 1, 0)
-        target = vel_old
-        target[np.where(who[:, 0] == 1)] = average_orientation(pos_old, vel_old,
-                                                               index_old[np.where(who[:, 0] == 1)],
-                                                               particle_map_old, r)
+        target = deepcopy(vel)
+        target[np.where(who[:, 0] == 1)] = average_orientation(pos, target,
+                                                               index[np.where(who[:, 0] == 1)],
+                                                               particle_map, r)
         vel[np.where(who[:, 0] == 1)] = np.mod(target[np.where(who[:, 0] == 1)] +
                                                circ_vmrnd(0, kappa, who.sum()), 2 * np.pi)
-        pos = np.mod(pos_old + dt * scaled_velocity * np.c_[np.cos(vel), np.sin(vel)], l)
+        pos = np.mod(pos + dt * scaled_velocity * np.c_[np.cos(vel), np.sin(vel)], l)
 
         if t % 10 == 0:
             yield pos, vel
@@ -113,8 +107,8 @@ def circ_vmrnd(theta=0, kappa=1, n=10):
             if u[1] < c * (2 - c) or not (np.log(c) - np.log(u[1]) + 1 - c < 0):
                 break
 
-        alpha[j, 0] = theta + np.sign(u[2] - 0.5) * np.arccos(f)
-        alpha[j, 0] = np.angle(np.exp(1.0j * alpha[j, 0]))
+        alpha[j, 0] = np.mod(theta + np.sign(u[2] - 0.5) * np.arccos(f), 2 * np.pi)
+        alpha[j, 0] = alpha[j, 0] - 2 * np.pi if np.pi < alpha[j, 0] <= 2 * np.pi else alpha[j, 0]
 
     return alpha
 
@@ -127,14 +121,14 @@ def average_orientation(pos, vel, index, particle_map, r):
         first_indexes = [(index[i, 1] - 1) % k, index[i, 1] % k, (index[i, 1] + 1) % k]
         second_indexes = [(index[i, 2] - 1) % k, index[i, 2] % k, (index[i, 2] + 1) % k]
 
-        neighbours_map = np.asarray([[particle_map[x, y] for x in first_indexes] for y in second_indexes])
+        neighbours_map = np.array([[particle_map[x, y] for x in first_indexes] for y in second_indexes], dtype=np.object)
         neighbours = flatten(neighbours_map)
 
         result = np.linalg.norm(pos[neighbours, :] - pos[index[i, 0], :], ord=2, axis=1, keepdims=True)
         true_neighbours = neighbours[np.where(result < r)[0]]
 
         target = np.sum(np.c_[np.sin(vel[true_neighbours]), np.cos(vel[true_neighbours])], axis=0)
-        ao[i, 0] = np.angle(target[0] + 1.0j * target[1])
+        ao[i, 0] = np.arctan(target[1] / target[0])
     return ao
 
 
@@ -160,13 +154,13 @@ def fill_map(particle_map, index):
 
 
 def index_map(pos, r):
-    return np.c_[np.arange(len(pos)), np.floor(pos / r)].astype(int)
+    return np.c_[np.arange(len(pos)), (np.floor(pos / r))].astype(int)
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Depicting the movement of several quaternions in a 3D space")
 
-    parser.add_argument("-n", "--agents_num", type=int, default=500, help="The Number of Agents")
+    parser.add_argument("-n", "--agents_num", type=int, default=5000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
     parser.add_argument("-t", "--max_iter", type=int, default=5000, help="The Total Number of Iterations")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
