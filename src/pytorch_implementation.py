@@ -7,18 +7,13 @@ from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
 
 np.set_printoptions(precision=4)
-torch.set_printoptions(profile="full", precision=17, sci_mode=False)
+if not torch.cuda.is_available():
+    raise Exception("CUDA not available to be used for the program.")
 
-gpu_cudas = []
+gpu_cuda = torch.device("cuda")
 
 
 def main():
-    if not torch.cuda.is_available():
-        raise Exception("CUDA not available to be used for the program.")
-
-    global gpu_cudas
-    gpu_cudas = [torch.device(f"cuda:{i}") for i in range(torch.cuda.device_count())]
-
     n, l, t, r, v, nu, kappa = parse_args()
     # print(f"""Hyperparameters:-
     #     Number of Particles: {n}
@@ -44,7 +39,7 @@ def update_quiver_frame(frame_data, ax, l):
     ax.set_xticks(np.arange(0, l + sep, sep))
     ax.set_yticks(np.arange(0, l + sep, sep))
     ax.set_xlim(0, l)
-    ax.set_ylim(0, 1)
+    ax.set_ylim(0, l)
 
     pos, vel = frame_data
     scale = tensor(l / 60, torch.float)
@@ -59,8 +54,8 @@ def process_particles(n, l, t, r, v, nu, kappa):
     max_iter = torch.floor(t / dt).to(torch.int64).item()
     scaled_velocity = l * v
     rr = l / torch.floor(l / r)
-    pos = l * torch.rand(n, 2, device=gpu_cudas[0])
-    vel = 2 * np.pi * torch.rand(n, 1, device=gpu_cudas[0])
+    pos = l * torch.rand(n, 2, device=gpu_cuda)
+    vel = 2 * np.pi * torch.rand(n, 1, device=gpu_cuda)
 
     # print(f"""Calculated Parameters:-
     #     Time Discretisation Step: {dt}
@@ -79,13 +74,13 @@ def process_particles(n, l, t, r, v, nu, kappa):
     particle_map = fill_map(particle_map, index)
 
     for t in range(max_iter):
-        jump = torch.rand(n, 1, device=gpu_cudas[0])
-        who = torch.where(jump > torch.exp(-nu * dt), tensor(1, torch.int64), tensor(0, torch.int64))
+        jump = torch.rand(n, 1, device=gpu_cuda)
+        who = torch.where(torch.gt(jump, torch.exp(-nu * dt)), tensor(1, torch.int64), tensor(0, torch.int64))
         target = deepcopy(vel)
-        target[torch.where(who[:, 0] == 1)] = \
-            average_orientation(pos, target, index[torch.where(who[:, 0] == 1)], particle_map, r)
-        vel[torch.where(who[:, 0] == 1)] = \
-            torch.remainder(target[torch.where(who[:, 0] == 1)] + circ_vmrnd(0, kappa, torch.sum(who).item()),
+        target[torch.where(torch.eq(who[:, 0], 1))] = \
+            average_orientation(pos, target, index[torch.where(torch.eq(who[:, 0], 1))], particle_map, r)
+        vel[torch.where(torch.eq(who[:, 0], 1))] = \
+            torch.remainder(target[torch.where(torch.eq(who[:, 0], 1))] + circ_vmrnd(0, kappa, torch.sum(who).item()),
                             2 * tensor(np.pi, torch.float))
         pos = torch.remainder(pos + dt * scaled_velocity * torch.cat((torch.cos(vel), torch.sin(vel)), 1), l)
 
@@ -102,16 +97,16 @@ def circ_vmrnd(theta, kappa, n):
     tensors = [tensor(num, torch.int64) for num in range(5)]
 
     if kappa < tensor(1e-6, torch.float):
-        return tensors[2] * pi * torch.rand(n, 1, device=gpu_cudas[0]) - pi
+        return tensors[2] * pi * torch.rand(n, 1, device=gpu_cuda) - pi
 
     a = tensors[1] + torch.sqrt(tensors[1] + tensors[4] * kappa ** tensors[2])
     b = (a - torch.sqrt(tensors[2] * a)) / (tensors[2] * kappa)
     r = (tensors[1] + b ** tensors[2]) / (tensors[2] * b)
 
-    alpha = torch.zeros(n, 1, device=gpu_cudas[0])
+    alpha = torch.zeros(n, 1, device=gpu_cuda)
     for j in range(n):
         while True:
-            u = torch.rand(3, device=gpu_cudas[0])
+            u = torch.rand(3, device=gpu_cuda)
 
             z = torch.cos(pi * u[0])
             f = (tensors[1] + r * z) / (r + z)
@@ -130,7 +125,7 @@ def circ_vmrnd(theta, kappa, n):
 def average_orientation(pos, vel, index, particle_map, r):
     k = particle_map.shape[0]
     n = index.size()[0]
-    ao = torch.zeros(n, 1, device=gpu_cudas[0])
+    ao = torch.zeros(n, 1, device=gpu_cuda)
     for i in range(n):
         first_indexes = [(index[i, 1].item() - 1) % k, index[i, 1].item() % k, (index[i, 1].item() + 1) % k]
         second_indexes = [(index[i, 2].item() - 1) % k, index[i, 2].item() % k, (index[i, 2].item() + 1) % k]
@@ -140,7 +135,7 @@ def average_orientation(pos, vel, index, particle_map, r):
         neighbours = flatten(neighbours_map)
 
         result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1, keepdim=True)
-        true_neighbours = neighbours[torch.where(result < r)[0]]
+        true_neighbours = neighbours[torch.where(torch.lt(result, r))[0]]
 
         target = torch.sum(torch.cat((torch.sin(vel[true_neighbours]), torch.cos(vel[true_neighbours])), 1), 0)
         ao[i, 0] = torch.atan(target[1] / target[0])  # angle
@@ -169,16 +164,15 @@ def fill_map(particle_map, index):
 
 
 def index_map(pos, r):
-    indexes = torch.arange(pos.size()[0], device=gpu_cudas[0]).reshape(pos.size()[0], 1)
+    indexes = torch.arange(pos.size()[0], device=gpu_cuda).reshape(pos.size()[0], 1)
     return torch.cat((indexes, torch.floor(pos / r).to(torch.int64)), 1)
 
 
 def tensor(value, data_type):
-    return torch.tensor(value, dtype=data_type, device=gpu_cudas[0])
+    return torch.tensor(value, dtype=data_type, device=gpu_cuda)
 
 
 def parse_args():
-    global gpu_cudas
     parser = argparse.ArgumentParser(description="Depicting the movement of several quaternions in a 3D space")
 
     parser.add_argument("-n", "--agents_num", type=int, default=500, help="The Number of Agents")

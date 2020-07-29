@@ -34,12 +34,13 @@ def update_quiver_frame(frame_data, ax, l):
     ax.set_xticks(np.arange(0, l + sep, sep))
     ax.set_yticks(np.arange(0, l + sep, sep))
     ax.set_xlim(0, l)
-    ax.set_ylim(0, 1)
+    ax.set_ylim(0, l)
 
     pos, vel = frame_data
     scale = l / 60
 
-    q = ax.quiver(pos[:, 0].transpose(), pos[:, 1].transpose(), scale * np.cos(vel), scale * np.sin(vel))
+    q = ax.quiver(pos[:, 0].transpose(), pos[:, 1].transpose(),
+                  (scale * np.cos(vel)).flatten(), (scale * np.sin(vel)).flatten())
     ax.quiverkey(q, X=0.3, Y=1.1, U=0.05, label='Quiver key, length = 0.05', labelpos='E')
 
 
@@ -87,7 +88,7 @@ def process_particles(n, l, t, r, v, nu, kappa):
         particle_map = fill_map(particle_map, index)
 
 
-def circ_vmrnd(theta=0, kappa=1, n=10):
+def circ_vmrnd(theta, kappa, n):
     if kappa < 1e-6:
         return 2 * np.pi * np.random.random(size=(n, 1)) - np.pi
 
@@ -134,7 +135,7 @@ def average_orientation(pos, vel, index, particle_map, r):
 
 def flatten(array):
     result = []
-    rows, cols = array.shape
+    rows, cols, *_ = array.shape
     for x in range(rows):
         for y in range(cols):
             try:
@@ -160,8 +161,8 @@ def index_map(pos, r):
 def parse_args():
     parser = argparse.ArgumentParser(description="Depicting the movement of several quaternions in a 3D space")
 
-    parser.add_argument("-n", "--agents_num", type=int, default=5000, help="The Number of Agents")
-    parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
+    parser.add_argument("-n", "--agents_num", type=int, default=2500, help="The Number of Agents")
+    parser.add_argument("-l", "--box_size", type=int, default=5, help="The Size of the Box (Periodic Spatial Domain)")
     parser.add_argument("-t", "--max_iter", type=int, default=5000, help="The Total Number of Iterations")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
     parser.add_argument("-v", "--particle_velocity", type=float, default=0.02, help="The Velocity of the Particles")
