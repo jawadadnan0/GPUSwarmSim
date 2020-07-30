@@ -51,7 +51,7 @@ def update_quiver_frame(frame_data, ax, l):
 
 def process_particles(n, l, t, r, v, nu, kappa):
     dt = tensor(0.01, torch.float) / nu
-    max_iter = torch.floor(t / dt).to(torch.int64).item()
+    max_iter = torch.floor(t / dt).to(torch.int64).item() * 5
     scaled_velocity = l * v
     rr = l / torch.floor(l / r)
     pos = l * torch.rand(n, 2, device=gpu_cuda)
@@ -80,8 +80,8 @@ def process_particles(n, l, t, r, v, nu, kappa):
         target[torch.where(torch.eq(who[:, 0], 1))] = \
             average_orientation(pos, target, index[torch.where(torch.eq(who[:, 0], 1))], particle_map, r)
         vel[torch.where(torch.eq(who[:, 0], 1))] = \
-            torch.remainder(target[torch.where(torch.eq(who[:, 0], 1))] + circ_vmrnd(0, kappa, torch.sum(who).item()),
-                            2 * tensor(np.pi, torch.float))
+            torch.remainder(target[torch.where(torch.eq(who[:, 0], 1))] + von_mises_dist(0, kappa, torch.sum(who).item()),
+                            tensor(2 * np.pi, torch.float))
         pos = torch.remainder(pos + dt * scaled_velocity * torch.cat((torch.cos(vel), torch.sin(vel)), 1), l)
 
         if t % 10 == 0:
@@ -92,7 +92,7 @@ def process_particles(n, l, t, r, v, nu, kappa):
         particle_map = fill_map(particle_map, index)
 
 
-def circ_vmrnd(theta, kappa, n):
+def von_mises_dist(theta, kappa, n):
     pi = tensor(np.pi, torch.float)
     tensors = [tensor(num, torch.int64) for num in range(5)]
 
@@ -173,7 +173,7 @@ def parse_args():
 
     parser.add_argument("-n", "--agents_num", type=int, default=1000000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=100, help="The Size of the Box (Periodic Spatial Domain)")
-    parser.add_argument("-t", "--max_iter", type=int, default=50, help="The Total Number of Iterations")
+    parser.add_argument("-t", "--max_iter", type=int, default=50, help="The Total Number of Iterations/Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
     parser.add_argument("-v", "--particle_velocity", type=float, default=0.02, help="The Velocity of the Particles")
     parser.add_argument("-nu", "--jump_rate", type=float, default=0.3, help="The Jump Rate")
