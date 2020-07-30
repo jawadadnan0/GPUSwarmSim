@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 
-from typing import Generator, Tuple, Union
+from typing import Generator, Tuple
 from copy import deepcopy
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
