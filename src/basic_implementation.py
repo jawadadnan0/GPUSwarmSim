@@ -23,9 +23,9 @@ def main():
 
     writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
     ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
-                        fargs=(ax, l), interval=10, save_count=t)
-    # ani.save("quiver.mp4", writer=writer)
-    plt.show()
+                        fargs=(ax, l), interval=30, save_count=int(100 * t * nu) + 1, repeat=False)
+    ani.save("quiver_basic.mp4", writer=writer)
+    # plt.show()
 
 
 def update_quiver_frame(frame_data, ax, l):
@@ -81,6 +81,7 @@ def process_particles(n, l, t, r, v, nu, kappa):
         pos = np.mod(pos + dt * scaled_velocity * np.c_[np.cos(vel), np.sin(vel)], l)
 
         if t % 10 == 0:
+            print(f"Iteration number: {t} (out of {max_iter} iterations)")
             yield pos, vel
 
         index = index_map(pos, rr)
@@ -92,7 +93,7 @@ def circ_vmrnd(theta, kappa, n):
     if kappa < 1e-6:
         return 2 * np.pi * np.random.random(size=(n, 1)) - np.pi
 
-    a = 1 + np.sqrt((1 + 4 * kappa ** 2))
+    a = 1 + np.sqrt(1 + 4 * kappa ** 2)
     b = (a - np.sqrt(2 * a)) / (2 * kappa)
     r = (1 + b ** 2) / (2 * b)
 
@@ -122,9 +123,7 @@ def average_orientation(pos, vel, index, particle_map, r):
         first_indexes = [(index[i, 1] - 1) % k, index[i, 1] % k, (index[i, 1] + 1) % k]
         second_indexes = [(index[i, 2] - 1) % k, index[i, 2] % k, (index[i, 2] + 1) % k]
 
-        neighbours_map = np.array([[particle_map[x, y] for x in first_indexes] for y in second_indexes], dtype=np.object)
-        neighbours = flatten(neighbours_map)
-
+        neighbours = flatten([[particle_map[x, y] for x in first_indexes] for y in second_indexes])
         result = np.linalg.norm(pos[neighbours, :] - pos[index[i, 0], :], ord=2, axis=1, keepdims=True)
         true_neighbours = neighbours[np.where(result < r)[0]]
 
@@ -135,14 +134,13 @@ def average_orientation(pos, vel, index, particle_map, r):
 
 def flatten(array):
     result = []
-    rows, cols, *_ = array.shape
-    for x in range(rows):
-        for y in range(cols):
+    for x in range(len(array)):
+        for y in range(len(array[0])):
             try:
-                result += list(array[x, y])
+                result += list(array[x][y])
             except TypeError:
-                result += [array[x, y]]
-    return np.array(list(filter(lambda e: not np.isnan(e), result)))
+                result += [array[x][y]]
+    return np.array([e for e in result if not np.isnan(e)])
 
 
 def fill_map(particle_map, index):
@@ -161,9 +159,9 @@ def index_map(pos, r):
 def parse_args():
     parser = argparse.ArgumentParser(description="Depicting the movement of several quaternions in a 3D space")
 
-    parser.add_argument("-n", "--agents_num", type=int, default=2500, help="The Number of Agents")
+    parser.add_argument("-n", "--agents_num", type=int, default=50000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=5, help="The Size of the Box (Periodic Spatial Domain)")
-    parser.add_argument("-t", "--max_iter", type=int, default=5000, help="The Total Number of Iterations")
+    parser.add_argument("-t", "--max_iter", type=int, default=100, help="The Total Number of Iterations")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
     parser.add_argument("-v", "--particle_velocity", type=float, default=0.02, help="The Velocity of the Particles")
     parser.add_argument("-nu", "--jump_rate", type=float, default=0.3, help="The Jump Rate")

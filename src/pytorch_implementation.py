@@ -28,9 +28,9 @@ def main():
 
     writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
     ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
-                        fargs=(ax, l.item()), interval=10, save_count=t.item())
-    # ani.save("quiver.mp4", writer=writer)
-    plt.show()
+                        fargs=(ax, l.item()), interval=30, save_count=int(100 * t.item() * nu.item()) + 1, repeat=False)
+    ani.save("quiver_basic.mp4", writer=writer)
+    # plt.show()
 
 
 def update_quiver_frame(frame_data, ax, l):
@@ -130,10 +130,7 @@ def average_orientation(pos, vel, index, particle_map, r):
         first_indexes = [(index[i, 1].item() - 1) % k, index[i, 1].item() % k, (index[i, 1].item() + 1) % k]
         second_indexes = [(index[i, 2].item() - 1) % k, index[i, 2].item() % k, (index[i, 2].item() + 1) % k]
 
-        neighbours_map = np.array([[particle_map[x, y] for x in first_indexes] for y in second_indexes],
-                                  dtype=np.object)
-        neighbours = flatten(neighbours_map)
-
+        neighbours = flatten([[particle_map[x, y] for x in first_indexes] for y in second_indexes])
         result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1, keepdim=True)
         true_neighbours = neighbours[torch.where(torch.lt(result, r))[0]]
 
@@ -144,13 +141,12 @@ def average_orientation(pos, vel, index, particle_map, r):
 
 def flatten(array):
     result = []
-    rows, cols = array.shape
-    for x in range(rows):
-        for y in range(cols):
+    for x in range(len(array)):
+        for y in range(len(array[0])):
             try:
-                result += list(array[x, y])
+                result += list(array[x][y])
             except TypeError:
-                result += [array[x, y]]
+                result += [array[x][y]]
     return tensor([e for e in result if not np.isnan(e)], torch.int64)
 
 
@@ -175,9 +171,9 @@ def tensor(value, data_type):
 def parse_args():
     parser = argparse.ArgumentParser(description="Depicting the movement of several quaternions in a 3D space")
 
-    parser.add_argument("-n", "--agents_num", type=int, default=500, help="The Number of Agents")
-    parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
-    parser.add_argument("-t", "--max_iter", type=int, default=5000, help="The Total Number of Iterations")
+    parser.add_argument("-n", "--agents_num", type=int, default=1000000, help="The Number of Agents")
+    parser.add_argument("-l", "--box_size", type=int, default=100, help="The Size of the Box (Periodic Spatial Domain)")
+    parser.add_argument("-t", "--max_iter", type=int, default=50, help="The Total Number of Iterations")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
     parser.add_argument("-v", "--particle_velocity", type=float, default=0.02, help="The Velocity of the Particles")
     parser.add_argument("-nu", "--jump_rate", type=float, default=0.3, help="The Jump Rate")
