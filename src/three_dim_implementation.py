@@ -18,6 +18,17 @@ gpu_cuda = torch.device("cuda")
 
 
 def main() -> None:
+    """
+    The main function that parses the program arguments using parse_args(),
+    creates a plot for a moving quiver diagram, sets up a writer for the video
+    file with ffmpeg format with metadata, creates the animation by calling
+    process_particles() generator to recieve frame data, passes it along to
+    update_quiver_frame() function to draw out a frame and this gets either
+    shown in a window or saved to "quiver_3D.mp4" to create a video.
+
+    Returns: None (void function)
+
+    """
     save, file, n, l, t, r, v, nu, kappa = parse_args()
     # print(file"""Hyperparameters:-
     #     Save to File: {save}
@@ -45,6 +56,18 @@ def main() -> None:
 
 
 def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes3D, l: int) -> None:
+    """
+    This function is executed every single time the frame needs to updated
+    whether it is to view it in real-time or to save it into a video.
+
+    Args:
+        frame_data: A tuple of two Tensors, containing the positions and velocities of the particles.
+        ax: The 3D axis object of the plot in order to help set it up.
+        l: The length of the square to be drawn that will contain the particles.
+
+    Returns: None (void function)
+
+    """
     ax.clear()
     sep = l / 10
 
@@ -69,6 +92,23 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes3D, l: int) -
 
 def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kappa: float) -> \
         Generator[Tuple[Tensor, Tensor], None, None]:
+    """
+    This function calculates the positions and velocities of each of the 'n' particles
+    for '100 * t * nu' iterations where the positions and velocities calculated are
+    sent back after every 10 iterations.
+
+    Args:
+        n: The number of particles in the simulation.
+        l: The length of edge of the box (Periodic Spatial Domain).
+        t: The total number of iterations/seconds the simulation is played for.
+        r: The radius of interaction each particle has on others.
+        v: The scale of the velocity of the particles.
+        nu: The jump time for each of the particles.
+        kappa: The concentration parameter for the simulation.
+
+    Returns: A generator which yields a tuple of two Tensors for position and velocity.
+
+    """
     dt = 0.01 / nu
     max_iter = np.floor(t / dt).astype(int) * 5
     scaled_velocity = l * v
@@ -121,6 +161,20 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
 
 
 def von_mises_dist(theta: float, kappa: float, n: int) -> Tensor:
+    """
+    Simulates 'n' random angles from a von Mises distribution, with preferred
+    direction 'theta' and concentration parameter 'kappa'.
+
+    Args:
+        theta: The mean angle, i.e. the preferred rotation.
+        kappa: The concentration of distribution (the higher the value, the
+            more concentrated the data is around 'theta').
+            [Note]: small kappa -> uniform distribution.
+        n: The number of random angles to generate.
+
+    Returns: A Tensor of size 'n' with random angle around 'theta'.
+
+    """
     if kappa < 1e-6:
         return torch.mul(torch.rand(n, 1, device=gpu_cuda), 2 * np.pi).sub(np.pi)
 
@@ -148,6 +202,24 @@ def von_mises_dist(theta: float, kappa: float, n: int) -> Tensor:
 
 def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
                         particle_map: np.ndarray, r: float) -> Tensor:
+    """
+    This function uses the velocities of all the particles, within the
+    interaction radius 'r' for each and every particle, to calculate
+    an average orientation (angles) that will then be used to calculate
+    the new position for that particle.
+
+    Args:
+        pos: A Tensor containing the positions for all the particles.
+        vel: A Tensor containing the velocities for all the particles.
+        index: A Tensor containing a map of the indexes alongside their
+            previous positions that is jumping in this iteration.
+        particle_map: A numpy array that keeps a track of where the particles are and have been.
+        r: The interaction radius for each particle.
+
+    Returns: A Tensor of ('n', 2) angles that will be used to update the positions
+        of particles jumping in this iteration.
+
+    """
     k = particle_map.shape[0]
     n = index.size()[0]
     ao = torch.zeros(n, 2, device=gpu_cuda)
@@ -171,6 +243,17 @@ def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
 
 
 def flatten(array_matrix: List[Any]) -> Tensor:
+    """
+    Helper function that helps to convert a list of values and/or
+    arrays of indexes into a Tensor where each array is concatenated
+    to each other left-to-right.
+
+    Args:
+        array_matrix: A list of values and/or arrays of indexes.
+
+    Returns: A Tensor that is a flattened version (no sub-lists) of 'array_matrix'.
+
+    """
     result = []
     for i in range(len(array_matrix)):
         try:
@@ -181,6 +264,21 @@ def flatten(array_matrix: List[Any]) -> Tensor:
 
 
 def fill_map(particle_map: np.ndarray, index: Tensor) -> np.ndarray:
+    """
+    Fills in a particle map with the index value of each particle.
+    If the value at position in the map from 'index' is empty, a new
+    array is created with that index as its only element. Otherwise,
+    the index is inserted at the beginning of the exisiting array.
+
+    Args:
+        particle_map: A numpy 2D matrix map of the simulation box where each
+            value is a location quadrant where a group of particles may exist.
+        index: A Tensor containing the particles' indexes and their
+            corresponding position.
+
+    Returns: The given particle map with new indexes filled in.
+
+    """
     for i in range(index.size()[0]):
         if np.all(np.isnan(particle_map[index[i, 1], index[i, 2], index[i, 3]])):
             particle_map[index[i, 1], index[i, 2], index[i, 3]] = \
@@ -192,11 +290,36 @@ def fill_map(particle_map: np.ndarray, index: Tensor) -> np.ndarray:
 
 
 def index_map(pos: Tensor, r: float) -> Tensor:
+    """
+    Creates a new Tensor that holds each particle's index
+    position and their scaled position value. The scaling is
+    done according to the interaction radius (which itself is
+    scaled according to the length of the box).
+
+    Args:
+        pos: A Tensor that holds the position data of each particle.
+        r: The interaction radius scaled according tot length of the box.
+
+    Returns: A new Tensor with particles' indexes as the first column
+        and their positions for the next two.
+
+    """
     indexes = torch.arange(pos.size()[0], device=gpu_cuda).reshape(pos.size()[0], 1)
     return torch.cat((indexes, torch.floor(torch.div(pos, r)).to(torch.int64)), 1)
 
 
 def tensor(value: Any, data_type: Any) -> Tensor:
+    """
+    A helper function to easily build a Tensor for any given
+    value and its data type that can be sent to a CUDA GPU.
+
+    Args:
+        value: Any value to be entered into Tensor
+        data_type: The data type for the Tensor
+
+    Returns: A new Tensor with given value and data type.
+
+    """
     return torch.tensor(value, dtype=data_type, device=gpu_cuda)
 
 
@@ -215,7 +338,7 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
                                                  "space using a combination of CPU and GPU.")
 
     parser.add_argument("-s", "--save", action="store_true", default=False, help="Save in a File or not.")
-    parser.add_argument("-f", "--video_file", type=str, default="quiver_efficient.mp4", help="The Video File to Save in")
+    parser.add_argument("-f", "--video_file", type=str, default="quiver_3D.mp4", help="The Video File to Save in")
     parser.add_argument("-n", "--agents_num", type=int, default=1000000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=100, help="The Size of the Box (Periodic Spatial Domain)")
     parser.add_argument("-t", "--max_iter", type=int, default=10, help="The Total Number of Iterations/Seconds")
