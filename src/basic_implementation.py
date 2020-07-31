@@ -1,11 +1,12 @@
 import argparse
 import numpy as np
 
-from typing import Generator, Tuple
 from copy import deepcopy
+from datetime import datetime
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
 from matplotlib.axes import Axes
+from typing import Any, Generator, List, Tuple
 
 np.set_printoptions(precision=4)
 
@@ -22,8 +23,10 @@ def main() -> None:
     Returns: None (void function)
 
     """
-    n, l, t, r, v, nu, kappa = parse_args()
-    # print(f"""Hyperparameters:-
+    save, file, n, l, t, r, v, nu, kappa = parse_args()
+    # print(file"""Hyperparameters:-
+    #     Save to File: {save}
+    #     Save File Name: {file}
     #     Number of Particles: {n}
     #     Periodic Spatial Domain: {l}
     #     Total No. of Iterations: {t}
@@ -31,14 +34,18 @@ def main() -> None:
     #     Initial Particle velocity: {v}
     #     Jump Rate: {nu}
     #     Concentration Parameter: {kappa}""")
-
+    current_time = datetime.now()
     fig, ax = plt.subplots(dpi=200)
 
     writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
     ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
                         fargs=(ax, l), interval=30, save_count=int(100 * t * nu) + 1, repeat=False)
-    ani.save("quiver_basic.mp4", writer=writer)
-    # plt.show()
+
+    if save:
+        ani.save(file, writer=writer)
+        print("[100% Complete] Time taken:", (datetime.now() - current_time).seconds, "seconds")
+    else:
+        plt.show()
 
 
 def update_quiver_frame(frame_data: Tuple[np.ndarray, np.ndarray], ax: Axes, l: int) -> None:
@@ -66,7 +73,8 @@ def update_quiver_frame(frame_data: Tuple[np.ndarray, np.ndarray], ax: Axes, l: 
 
     q = ax.quiver(pos[:, 0].transpose(), pos[:, 1].transpose(),
                   (scale * np.cos(vel)).flatten(), (scale * np.sin(vel)).flatten())
-    ax.quiverkey(q, X=0.3, Y=1.1, U=0.05, label='Quiver key, length = 0.05', labelpos='E')
+    ax.quiverkey(q, X=0.3, Y=1.1, U=0.05,
+                 label=f"Quiver key, length = 0.05 - Particles: {pos.shape[0]:,}", labelpos='E')
 
 
 def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kappa: float) -> \
@@ -103,12 +111,12 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     #     Scaled Velocity of Particles: {scaled_velocity}
     #     Scale: {scale}
     #     Scaled Interaction Radius: {rr}""")
+    empty_particle_map = np.full((int(l / rr), int(l / rr)), np.nan).astype(np.object)
 
-    particle_map = np.full((int(l / rr), int(l / rr)), np.nan).astype(np.object)
     index = index_map(pos, rr)
-    particle_map = fill_map(particle_map, index)
+    particle_map = fill_map(deepcopy(empty_particle_map), index)
 
-    for t in range(max_iter):
+    for t in range(max_iter + 1):
         jump = random.uniform(size=(n, 1))
         who = np.where(jump > np.exp(-nu * dt), 1, 0)
         target = deepcopy(vel)
@@ -119,12 +127,11 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
         pos = np.mod(pos + dt * scaled_velocity * np.c_[np.cos(vel), np.sin(vel)], l)
 
         if t % 10 == 0:
-            print(f"Iteration number: {t} (out of {max_iter} iterations)")
+            print(f"Iteration number: {t} (out of {max_iter} iterations) [{(100 * t) // max_iter}% complete]")
             yield pos, vel
 
         index = index_map(pos, rr)
-        particle_map = np.full((int(l / rr), int(l / rr)), np.nan).astype(np.object)
-        particle_map = fill_map(particle_map, index)
+        particle_map = fill_map(deepcopy(empty_particle_map), index)
 
 
 def von_mises_dist(theta: float, kappa: float, n: int) -> np.ndarray:
@@ -167,7 +174,8 @@ def von_mises_dist(theta: float, kappa: float, n: int) -> np.ndarray:
     return alpha
 
 
-def average_orientation(pos, vel, index, particle_map, r):
+def average_orientation(pos: np.ndarray, vel: np.ndarray, index: np.ndarray,
+                        particle_map: np.ndarray, r: float) -> np.ndarray:
     """
     This function uses the velocities of all the particles, within the
     interaction radius 'r' for each and every particle, to calculate
@@ -202,7 +210,7 @@ def average_orientation(pos, vel, index, particle_map, r):
     return ao
 
 
-def flatten(array_matrix):
+def flatten(array_matrix: List[List[Any]]) -> np.ndarray:
     """
     Helper function that helps to convert a 2D matrix of arrays
     into a 1D numpy array where each array is concatenated to
@@ -266,7 +274,7 @@ def index_map(pos: np.ndarray, r: float) -> np.ndarray:
     return np.c_[np.arange(len(pos)), np.floor(pos / r)].astype(int)
 
 
-def parse_args() -> Tuple[int, int, int, float, float, float, float]:
+def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
     """
     This function handles the program arguments provided to the program
     when the program starts. It has default values in case of missing
@@ -277,11 +285,14 @@ def parse_args() -> Tuple[int, int, int, float, float, float, float]:
         needed to run the simulation.
 
     """
-    parser = argparse.ArgumentParser(description="Depicting the movement of several quaternions in a 3D space")
+    parser = argparse.ArgumentParser(description="Depicting the movement of several particles in a 2D "
+                                                 "space using only the CPU.")
 
-    parser.add_argument("-n", "--agents_num", type=int, default=50000, help="The Number of Agents")
-    parser.add_argument("-l", "--box_size", type=int, default=5, help="The Size of the Box (Periodic Spatial Domain)")
-    parser.add_argument("-t", "--max_iter", type=int, default=100, help="The Total Number of Iterations/Seconds")
+    parser.add_argument("-s", "--save", action="store_true", default=True, help="Save in a File or not.")
+    parser.add_argument("-f", "--video_file", type=str, default="quiver_basic.mp4", help="The Video File to Save in")
+    parser.add_argument("-n", "--agents_num", type=int, default=1000000, help="The Number of Agents")
+    parser.add_argument("-l", "--box_size", type=int, default=100, help="The Size of the Box (Periodic Spatial Domain)")
+    parser.add_argument("-t", "--max_iter", type=int, default=10, help="The Total Number of Iterations/Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
     parser.add_argument("-v", "--particle_velocity", type=float, default=0.02, help="The Velocity of the Particles")
     parser.add_argument("-nu", "--jump_rate", type=float, default=0.3, help="The Jump Rate")
@@ -289,8 +300,8 @@ def parse_args() -> Tuple[int, int, int, float, float, float, float]:
 
     args = parser.parse_args()
 
-    return args.agents_num, args.box_size, args.max_iter, args.interact_radius, \
-           args.particle_velocity, args.jump_rate, args.concentration
+    return args.save, args.video_file, args.agents_num, args.box_size, args.max_iter, \
+           args.interact_radius, args.particle_velocity, args.jump_rate, args.concentration
 
 
 if __name__ == '__main__':
