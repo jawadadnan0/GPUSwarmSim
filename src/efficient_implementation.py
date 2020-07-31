@@ -56,6 +56,18 @@ def main() -> None:
 
 
 def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int) -> None:
+    """
+    This function is executed every single time the frame needs to updated
+    whether it is to view it in real-time or to save it into a video.
+
+    Args:
+        frame_data: A tuple of two Tensors, containing the positions and velocities of the particles.
+        ax: The axis object of the plot in order to help set it up.
+        l: The length of the square to be drawn that will contain the particles.
+
+    Returns: None (void function)
+
+    """
     ax.clear()
     sep = l / 10
 
