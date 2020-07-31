@@ -1,6 +1,7 @@
 # GPUSwarmSim
 This is my 3rd Year Final Project on the Simulation of bio-inspired swarming drones on GPU.
 
+## Summary
 Technology becomes increasingly inspired by nature (from swimsuits imitating
 shark skin to micro-drones copying insects). Here, we are interested in the
 decentralized control of swarming drones through coordination rules inspired
@@ -32,7 +33,19 @@ and consequently, between the processors, and this is where a smart
 implementation within GPU’s is needed. This would be the task to be carried
 out in the present project.
 
-A strong mathematical background is welcome to get a grip on the theory
-behind the model and to interpret the results. Most importantly strong
-computational skills and proficiency with GPUs will be key for the success
-of the project
+## Installation
+
+Make sure to install CUDA Toolkit Version 10.2 (or above) for your appropriate
+Operating System through the link below:
+
+https://developer.nvidia.com/cuda-downloads
+
+Third-party library files used in this Simulation:
+
+i) Numpy 1.19.0 (or above): https://numpy.org/install/
+ii) PyTorch 1.6.0 (or above): https://pytorch.org/
+iii) Matplotlib 3.30 (or above): https://matplotlib.org/users/installing.html
+
+Or you can run the following command in Terminal in this directory:
+
+		pip install -r requirements.txt
