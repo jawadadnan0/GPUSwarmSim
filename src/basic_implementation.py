@@ -54,7 +54,7 @@ def update_quiver_frame(frame_data: Tuple[np.ndarray, np.ndarray], ax: Axes, l: 
     whether it is to view it in real-time or to save it into a video.
 
     Args:
-        frame_data: A tuple of two ndarray, containing the positions and velocities of the particles.
+        frame_data: A tuple of two numpy arrays, containing the positions and velocities of the particles.
         ax: The axis object of the plot in order to help set it up.
         l: The length of the square to be drawn that will contain the particles.
 
