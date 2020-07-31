@@ -49,3 +49,42 @@ iii) Matplotlib 3.30 (or above): https://matplotlib.org/users/installing.html
 Or you can run the following command in Terminal in main directory:
 
 		pip install -r requirements.txt
+
+## Implementations
+
+There are four variations of Swarm Simulation in this repository. Each
+implementation has its own set of PROS and CONS which is why they are
+left in this respository. They are as follows:
+
+i) `src/basic_implementation.py`: This is the first implementation
+of the Swarm Simulation. This implementation only used NumPy on the CPU
+to calculate and update the positions and velocities of particles. This
+is very easy to use in real-time for a small set of particles (under
+10,000) however it fails to parallelise or accelerate the process unlike
+a GPU.
+
+ii) `src/pytorch_implementation.py`: This is the implementation where
+(almost) all of the processing is carried out by the CUDA GPU(s) using
+the help of the PyTorch library. This is good for a set-up heavily based
+on the GPU (like a GPU cluster) where the CPU might not be able to handle
+most parts of the processing. This implementation is VERY SLOW and HIGHLY
+INEFFICIENT for normal computers to run.
+
+iii) `src/efficient_implementation.py`: This implementation is where the
+processing divided between the CPU and the CUDA GPU(s). The CPU focuses on
+singular value-based data in the simulation (like calculating the von
+Mises Distribution) which the CPU can quickly process. The CUDA GPU(s) is
+tasked with processes it is better at, like creating large randomised
+or uninitialised arrays, array operations, and array traversing. This is
+the BEST implementation to run for normal computers with CUDA GPU(s) for
+large number of particles (around 1,000,000). However, this code has a
+VERY BIG BOTTLENECK, which is its memory space and having to transfer
+data from main memory (RAM) to dedicated GPU memory (VRAM). So real-time
+performance does suffer. This is the FINAL SUBMISSION of the code.
+
+iv) `src/three_dim_implementation.py`: This implementation is where the
+algorithm from `src/efficient_implementation.py` is applied to a 3D space
+and plotted on a 3D Axes. The code is HIGHLY UNSTABLE and seems to crash
+once in a while due to Tensor size issues. This is meant to be the final
+version of the code which takes care of all the possible dimensions of
+a particle not just two dimensions.

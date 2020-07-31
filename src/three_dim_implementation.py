@@ -124,7 +124,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     #     Scale: {scale}
     #     Scaled Interaction Radius: {rr}""")
 
-    empty_particle_map = np.full((l // rr, l // rr, l // rr), np.nan).astype(np.object)
+    empty_particle_map = np.full((int(l / rr), int(l / rr), int(l / rr)), np.nan).astype(np.object)
 
     index = index_map(pos, rr)
     particle_map = fill_map(deepcopy(empty_particle_map), index)
@@ -141,11 +141,11 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
         vel[:, 0][torch.where(torch.eq(who[:, 0], 1))] = \
             torch.remainder(target[:, 0][torch.where(torch.eq(who[:, 0], 1))] +
                                 von_mises_dist(0, kappa, torch.sum(who).item()),
-                            tensor(2 * np.pi, torch.float))
+                            tensor(2 * np.pi, torch.float)).flatten()
         vel[:, 1][torch.where(torch.eq(who[:, 0], 1))] = \
             torch.remainder(target[:, 1][torch.where(torch.eq(who[:, 0], 1))] +
                                 von_mises_dist(0, kappa, torch.sum(who).item()),
-                            tensor(np.pi, torch.float))
+                            tensor(np.pi, torch.float)).flatten()
 
         x = torch.sin(vel[:, 1]) * torch.cos(vel[:, 0])
         y = torch.sin(vel[:, 1]) * torch.sin(vel[:, 0])
@@ -339,8 +339,8 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
 
     parser.add_argument("-s", "--save", action="store_true", default=False, help="Save in a File or not.")
     parser.add_argument("-f", "--video_file", type=str, default="quiver_3D.mp4", help="The Video File to Save in")
-    parser.add_argument("-n", "--agents_num", type=int, default=1000000, help="The Number of Agents")
-    parser.add_argument("-l", "--box_size", type=int, default=100, help="The Size of the Box (Periodic Spatial Domain)")
+    parser.add_argument("-n", "--agents_num", type=int, default=50, help="The Number of Agents")
+    parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
     parser.add_argument("-t", "--max_iter", type=int, default=10, help="The Total Number of Iterations/Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
     parser.add_argument("-v", "--particle_velocity", type=float, default=0.02, help="The Velocity of the Particles")
