@@ -42,7 +42,7 @@ https://developer.nvidia.com/cuda-downloads
 
 Third-party library files used in this Simulation:
 
-i) Numpy 1.19.0 (or above): https://numpy.org/install/ 
+i) Numpy 1.19.0 (or above): https://numpy.org/install/  
 ii) PyTorch 1.6.0 (or above): https://pytorch.org/  
 iii) Matplotlib 3.30 (or above): https://matplotlib.org/users/installing.html
 
