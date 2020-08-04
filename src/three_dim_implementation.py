@@ -11,9 +11,10 @@ from torch import Tensor
 from typing import Any, Generator, List, Tuple
 
 np.set_printoptions(precision=4)
+torch.Tensor.ndim = property(lambda self: len(self.shape))
+
 if not torch.cuda.is_available():
     raise Exception("CUDA not available to be used for the program.")
-
 gpu_cuda = torch.device("cuda")
 
 
@@ -82,12 +83,12 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes3D, l: int) -
     pos, vel = frame_data
     scale = l / 60
 
-    q = ax.quiver(pos[:, 0].tolist(), pos[:, 1].tolist(), pos[:, 2].tolist(),
-                  torch.mul(torch.sin(vel[:, 1]) * torch.cos(vel[:, 0]), scale).flatten().tolist(),
-                  torch.mul(torch.sin(vel[:, 1]) * torch.sin(vel[:, 0]), scale).flatten().tolist(),
-                  torch.mul(torch.cos(vel[:, 1]), scale).flatten().tolist())
-    ax.quiverkey(q, X=0.3, Y=1.1, Z=0.3, U=0.05,
-                 label=f"Quiver key, length = 0.05 - Particles: {pos.size()[0]:,}", labelpos='E')
+    q = ax.quiver(pos[:, 0], pos[:, 1], pos[:, 2],
+                  torch.mul(torch.sin(vel[:, 1]) * torch.cos(vel[:, 0]), scale).flatten(),
+                  torch.mul(torch.sin(vel[:, 1]) * torch.sin(vel[:, 0]), scale).flatten(),
+                  torch.mul(torch.cos(vel[:, 1]), scale).flatten())
+    ax.quiverkey(q, X=0.2, Y=1.1, Z=0.3, U=1,
+                 label=f"Quiver key - Length = 1. Particles: {pos.shape[0]:,}", labelpos='E')
 
 
 def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kappa: float) -> \
@@ -312,7 +313,7 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
     parser = argparse.ArgumentParser(description="Depicting the movement of several particles in a 3D "
                                                  "space using a combination of CPU and GPU.")
 
-    parser.add_argument("-s", "--save", action="store_true", default=False, help="Save in a File or not.")
+    parser.add_argument("-s", "--save", action="store_true", default=True, help="Save in a File or not.")
     parser.add_argument("-f", "--video_file", type=str, default="quiver_3D.mp4", help="The Video File to Save in")
     parser.add_argument("-n", "--agents_num", type=int, default=50, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")

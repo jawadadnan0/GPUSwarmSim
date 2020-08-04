@@ -73,8 +73,8 @@ def update_quiver_frame(frame_data: Tuple[np.ndarray, np.ndarray], ax: Axes, l: 
 
     q = ax.quiver(pos[:, 0].transpose(), pos[:, 1].transpose(),
                   (scale * np.cos(vel)).flatten(), (scale * np.sin(vel)).flatten())
-    ax.quiverkey(q, X=0.3, Y=1.1, U=0.05,
-                 label=f"Quiver key, length = 0.05 - Particles: {pos.shape[0]:,}", labelpos='E')
+    ax.quiverkey(q, X=0.2, Y=1.1, U=1,
+                 label=f"Quiver key - Length = 1. Particles: {pos.shape[0]:,}", labelpos='E')
 
 
 def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kappa: float) -> \
