@@ -42,7 +42,7 @@ def main() -> None:
     #     Concentration Parameter: {kappa}""")
 
     current_time = datetime.now()
-    fig, ax = plt.subplots(dpi=200)
+    fig, ax = plt.subplots(dpi=600)
 
     writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
     ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
@@ -124,7 +124,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     #     Direction of the Motion of Particles:
     #     {vel}""")
 
-    empty_particle_map = np.full((int(l / rr), int(l / rr)), np.nan).astype(np.object)
+    empty_particle_map = [[[] for _ in range(int(l / rr))] for _ in range(int(l / rr))]
 
     index = index_map(pos, rr)
     particle_map = fill_map(deepcopy(empty_particle_map), index)
@@ -139,7 +139,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
             average_orientation(pos, target, index[torch.where(torch.eq(who[:, 0], 1))], particle_map, r)
         vel[torch.where(torch.eq(who[:, 0], 1))] = \
             torch.remainder(target[torch.where(torch.eq(who[:, 0], 1))] +
-                                von_mises_dist(0, kappa, torch.sum(who).item()),
+                            von_mises_dist(0, kappa, torch.sum(who).item()),
                             tensor(2 * np.pi, torch.float))
         pos = torch.remainder(pos + torch.mul(torch.cat((torch.cos(vel), torch.sin(vel)), 1), dt * scaled_velocity), l)
 
@@ -192,7 +192,7 @@ def von_mises_dist(theta: float, kappa: float, n: int) -> Tensor:
 
 
 def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
-                        particle_map: np.ndarray, r: float) -> Tensor:
+                        particle_map: List[List[List[int]]], r: float) -> Tensor:
     """
     This function uses the velocities of all the particles, within the
     interaction radius 'r' for each and every particle, to calculate
@@ -211,14 +211,14 @@ def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
         of particles jumping in this iteration.
 
     """
-    k = particle_map.shape[0]
+    k = len(particle_map)
     n = index.size()[0]
     ao = torch.zeros(n, 1, device=gpu_cuda)
     for i in range(n):
         first_indexes = [(index[i, 1].item() + j) % k for j in range(-1, 2)]
         second_indexes = [(index[i, 2].item() + j) % k for j in range(-1, 2)]
 
-        neighbours = flatten([particle_map[x, y] for x in first_indexes for y in second_indexes])
+        neighbours = tensor(sum([particle_map[x][y] for x in first_indexes for y in second_indexes], []), torch.int64)
         result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1, keepdim=True)
         true_neighbours = neighbours[torch.where(torch.lt(result, r))[0]]
 
@@ -227,28 +227,7 @@ def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
     return ao
 
 
-def flatten(array_matrix: List[Any]) -> Tensor:
-    """
-    Helper function that helps to convert a list of values and/or
-    arrays of indexes into a Tensor where each array is concatenated
-    to each other left-to-right.
-
-    Args:
-        array_matrix: A list of values and/or arrays of indexes.
-
-    Returns: A Tensor that is a flattened version (no sub-lists) of 'array_matrix'.
-
-    """
-    result = []
-    for i in range(len(array_matrix)):
-        try:
-            result += list(array_matrix[i])
-        except TypeError:
-            result += [array_matrix[i]]
-    return tensor([e for e in result if not np.isnan(e)], torch.int64)
-
-
-def fill_map(particle_map: np.ndarray, index: Tensor) -> np.ndarray:
+def fill_map(particle_map: List[List[List[int]]], index: Tensor) -> List[List[List[int]]]:
     """
     Fills in a particle map with the index value of each particle.
     If the value at position in the map from 'index' is empty, a new
@@ -265,10 +244,7 @@ def fill_map(particle_map: np.ndarray, index: Tensor) -> np.ndarray:
 
     """
     for i in range(index.size()[0]):
-        if np.all(np.isnan(particle_map[index[i, 1], index[i, 2]])):
-            particle_map[index[i, 1], index[i, 2]] = np.array([index[i, 0].item()])
-        else:
-            particle_map[index[i, 1], index[i, 2]] = np.r_[index[i, 0].item(), particle_map[index[i, 1], index[i, 2]]]
+        particle_map[index[i, 1].item()][index[i, 2].item()].insert(0, index[i, 0].item())
     return particle_map
 
 
@@ -320,9 +296,10 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
     parser = argparse.ArgumentParser(description="Depicting the movement of several particles in a 2D "
                                                  "space using a combination of CPU and GPU.")
 
-    parser.add_argument("-s", "--save", action="store_true", default=False, help="Save in a File or not.")
-    parser.add_argument("-f", "--video_file", type=str, default="quiver_efficient.mp4", help="The Video File to Save in")
-    parser.add_argument("-n", "--agents_num", type=int, default=1000000, help="The Number of Agents")
+    parser.add_argument("-s", "--save", action="store_true", default=True, help="Save in a File or not.")
+    parser.add_argument("-f", "--video_file", type=str, default="quiver_efficient.mp4",
+                        help="The Video File to Save in")
+    parser.add_argument("-n", "--agents_num", type=int, default=100000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=100, help="The Size of the Box (Periodic Spatial Domain)")
     parser.add_argument("-t", "--max_iter", type=int, default=60, help="The Total Number of Iterations/Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")

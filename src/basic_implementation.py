@@ -35,7 +35,7 @@ def main() -> None:
     #     Jump Rate: {nu}
     #     Concentration Parameter: {kappa}""")
     current_time = datetime.now()
-    fig, ax = plt.subplots(dpi=2000)
+    fig, ax = plt.subplots(dpi=300)
 
     writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
     ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
@@ -111,7 +111,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     #     Scaled Velocity of Particles: {scaled_velocity}
     #     Scale: {scale}
     #     Scaled Interaction Radius: {rr}""")
-    empty_particle_map = np.full((int(l / rr), int(l / rr)), np.nan).astype(np.object)
+    empty_particle_map = [[[] for _ in range(int(l / rr))] for _ in range(int(l / rr))]
 
     index = index_map(pos, rr)
     particle_map = fill_map(deepcopy(empty_particle_map), index)
@@ -175,7 +175,7 @@ def von_mises_dist(theta: float, kappa: float, n: int) -> np.ndarray:
 
 
 def average_orientation(pos: np.ndarray, vel: np.ndarray, index: np.ndarray,
-                        particle_map: np.ndarray, r: float) -> np.ndarray:
+                        particle_map: List[List[List[int]]], r: float) -> np.ndarray:
     """
     This function uses the velocities of all the particles, within the
     interaction radius 'r' for each and every particle, to calculate
@@ -194,14 +194,14 @@ def average_orientation(pos: np.ndarray, vel: np.ndarray, index: np.ndarray,
         of particles jumping in this iteration.
 
     """
-    k = particle_map.shape[0]
+    k = len(particle_map)
     n = index.shape[0]
     ao = np.zeros(shape=(n, 1))
     for i in range(n):
         first_indexes = [(index[i, 1].item() + j) % k for j in range(-1, 2)]
         second_indexes = [(index[i, 2].item() + j) % k for j in range(-1, 2)]
 
-        neighbours = flatten([particle_map[x, y] for x in first_indexes for y in second_indexes])
+        neighbours = np.array(sum([particle_map[x][y] for x in first_indexes for y in second_indexes], []))
         result = np.linalg.norm(pos[neighbours, :] - pos[index[i, 0], :], ord=2, axis=1, keepdims=True)
         true_neighbours = neighbours[np.where(result < r)[0]]
 
@@ -210,28 +210,7 @@ def average_orientation(pos: np.ndarray, vel: np.ndarray, index: np.ndarray,
     return ao
 
 
-def flatten(array_matrix: List[Any]) -> np.ndarray:
-    """
-    Helper function that helps to convert a list of values and/or
-    arrays of indexes into a 1D numpy array where each array is
-    concatenated to each other left-to-right.
-
-    Args:
-        array_matrix: A list of values and/or arrays of indexes.
-
-    Returns: A 1D numpy array that is a flattened version (no sub-list) of 'array_matrix'.
-
-    """
-    result = []
-    for i in range(len(array_matrix)):
-        try:
-            result += list(array_matrix[i])
-        except TypeError:
-            result += [array_matrix[i]]
-    return np.array([e for e in result if not np.isnan(e)])
-
-
-def fill_map(particle_map: np.ndarray, index: np.ndarray) -> np.ndarray:
+def fill_map(particle_map: List[List[List[int]]], index: np.ndarray) -> List[List[List[int]]]:
     """
     Fills in a particle map with the index value of each particle.
     If the value at position in the map from 'index' is empty, a new
@@ -248,10 +227,7 @@ def fill_map(particle_map: np.ndarray, index: np.ndarray) -> np.ndarray:
 
     """
     for i in range(len(index)):
-        if np.all(np.isnan(particle_map[index[i, 1], index[i, 2]])):
-            particle_map[index[i, 1], index[i, 2]] = np.array([index[i, 0]])
-        else:
-            particle_map[index[i, 1], index[i, 2]] = np.r_[index[i, 0], particle_map[index[i, 1], index[i, 2]]]
+        particle_map[index[i, 1].item()][index[i, 2].item()].insert(0, index[i, 0].item())
     return particle_map
 
 
@@ -291,7 +267,7 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
     parser.add_argument("-f", "--video_file", type=str, default="quiver_basic.mp4", help="The Video File to Save in")
     parser.add_argument("-n", "--agents_num", type=int, default=10000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=10, help="The Size of the Box (Periodic Spatial Domain)")
-    parser.add_argument("-t", "--max_iter", type=int, default=60, help="The Total Number of Iterations/Seconds")
+    parser.add_argument("-t", "--max_iter", type=int, default=20, help="The Total Number of Iterations/Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
     parser.add_argument("-v", "--particle_velocity", type=float, default=0.02, help="The Velocity of the Particles")
     parser.add_argument("-nu", "--jump_rate", type=float, default=0.3, help="The Jump Rate")
