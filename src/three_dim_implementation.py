@@ -124,10 +124,8 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     #     Scale: {scale}
     #     Scaled Interaction Radius: {rr}""")
 
-    empty_particle_map = np.full((int(l / rr), int(l / rr), int(l / rr)), np.nan).astype(np.object)
-
     index = index_map(pos, rr)
-    particle_map = fill_map(deepcopy(empty_particle_map), index)
+    particle_map = fill_map(int(l / rr), index)
 
     for t in range(max_iter + 1):
         jump = torch.rand(n, 1, device=gpu_cuda)
@@ -157,7 +155,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
             yield pos, vel
 
         index = index_map(pos, rr)
-        particle_map = fill_map(deepcopy(empty_particle_map), index)
+        particle_map = fill_map(int(l / rr), index)
 
 
 def von_mises_dist(theta: float, kappa: float, n: int) -> Tensor:
@@ -201,7 +199,7 @@ def von_mises_dist(theta: float, kappa: float, n: int) -> Tensor:
 
 
 def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
-                        particle_map: np.ndarray, r: float) -> Tensor:
+                        particle_map: List[List[List[List[int]]]], r: float) -> Tensor:
     """
     This function uses the velocities of all the particles, within the
     interaction radius 'r' for each and every particle, to calculate
@@ -213,14 +211,15 @@ def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
         vel: A Tensor containing the velocities for all the particles.
         index: A Tensor containing a map of the indexes alongside their
             previous positions that is jumping in this iteration.
-        particle_map: A numpy array that keeps a track of where the particles are and have been.
+        particle_map: The 3D list representing the map of the simulation box where each
+            value is a list of all the indexes of the particles in that quadrant
         r: The interaction radius for each particle.
 
     Returns: A Tensor of ('n', 2) angles that will be used to update the positions
         of particles jumping in this iteration.
 
     """
-    k = particle_map.shape[0]
+    k = len(particle_map)
     n = index.size()[0]
     ao = torch.zeros(n, 2, device=gpu_cuda)
     for i in range(n):
@@ -228,10 +227,11 @@ def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
         second_indexes = [(index[i, 2].item() + j) % k for j in range(-1, 2)]
         third_indexes = [(index[i, 3].item() + j) % k for j in range(-1, 2)]
 
-        neighbours = flatten([particle_map[x, y, z] for x in first_indexes for y in second_indexes for z in third_indexes])
+        neighbours = tensor(sum([particle_map[x][y][z] for x in first_indexes
+                                                       for y in second_indexes
+                                                       for z in third_indexes], []), torch.int64)
         result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1, keepdim=True)
         true_neighbours = neighbours[torch.where(torch.lt(result, r))[0]]
-
         target = torch.sum(torch.cat((torch.sin(vel[true_neighbours, 1]) * torch.cos(vel[true_neighbours, 0]),
                                       torch.sin(vel[true_neighbours, 1]) * torch.sin(vel[true_neighbours, 0]),
                                       torch.cos(vel[true_neighbours, 1])), 1), 0)
@@ -242,50 +242,25 @@ def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
     return ao
 
 
-def flatten(array_matrix: List[Any]) -> Tensor:
+def fill_map(size: int, index: Tensor) -> List[List[List[List[int]]]]:
     """
-    Helper function that helps to convert a list of values and/or
-    arrays of indexes into a Tensor where each array is concatenated
-    to each other left-to-right.
+    Breaks down the simulation box into quadrants (sub-boxes)
+    of equal length according to the interaction radius. Creates
+    a 3D list of those quadrants and enters the indexes of each
+    and every particle into their appropriate quadrants.
 
     Args:
-        array_matrix: A list of values and/or arrays of indexes.
-
-    Returns: A Tensor that is a flattened version (no sub-lists) of 'array_matrix'.
-
-    """
-    result = []
-    for i in range(len(array_matrix)):
-        try:
-            result += list(array_matrix[i])
-        except TypeError:
-            result += [array_matrix[i]]
-    return tensor([e for e in result if not np.isnan(e)], torch.int64)
-
-
-def fill_map(particle_map: np.ndarray, index: Tensor) -> np.ndarray:
-    """
-    Fills in a particle map with the index value of each particle.
-    If the value at position in the map from 'index' is empty, a new
-    array is created with that index as its only element. Otherwise,
-    the index is inserted at the beginning of the exisiting array.
-
-    Args:
-        particle_map: A numpy 2D matrix map of the simulation box where each
-            value is a location quadrant where a group of particles may exist.
+        size: The length of each quadrant (sub-boxes) of the box.
         index: A Tensor containing the particles' indexes and their
             corresponding position.
 
-    Returns: The given particle map with new indexes filled in.
+    Returns: The 3D list representing the map of the simulation box where each
+        value is a list of all the indexes of the particles in that quadrant.
 
     """
+    particle_map = [[[[] for _ in range(int(size))] for _ in range(int(size))] for _ in range(int(size))]
     for i in range(index.size()[0]):
-        if np.all(np.isnan(particle_map[index[i, 1], index[i, 2], index[i, 3]])):
-            particle_map[index[i, 1], index[i, 2], index[i, 3]] = \
-                np.array([index[i, 0].item()])
-        else:
-            particle_map[index[i, 1], index[i, 2], index[i, 3]] = \
-                np.r_[index[i, 0].item(), particle_map[index[i, 1], index[i, 2], index[i, 3]]]
+        particle_map[index[i, 1].item()][index[i, 2].item()][index[i, 3].item()].insert(0, index[i, 0].item())
     return particle_map
 
 

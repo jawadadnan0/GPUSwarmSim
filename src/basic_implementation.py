@@ -111,10 +111,9 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     #     Scaled Velocity of Particles: {scaled_velocity}
     #     Scale: {scale}
     #     Scaled Interaction Radius: {rr}""")
-    empty_particle_map = [[[] for _ in range(int(l / rr))] for _ in range(int(l / rr))]
 
     index = index_map(pos, rr)
-    particle_map = fill_map(deepcopy(empty_particle_map), index)
+    particle_map = fill_map(int(l / rr), index)
 
     for t in range(max_iter + 1):
         jump = random.uniform(size=(n, 1))
@@ -131,7 +130,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
             yield pos, vel
 
         index = index_map(pos, rr)
-        particle_map = fill_map(deepcopy(empty_particle_map), index)
+        particle_map = fill_map(int(l / rr), index)
 
 
 def von_mises_dist(theta: float, kappa: float, n: int) -> np.ndarray:
@@ -187,7 +186,8 @@ def average_orientation(pos: np.ndarray, vel: np.ndarray, index: np.ndarray,
         vel: A numpy array containing the velocities for all the particles.
         index: A map of the indexes alongside their previous positions that
             is jumping in this iteration.
-        particle_map: A numpy array that keeps a track of where the particles are and have been.
+        particle_map: A 2D list representing the map of the simulation square where each
+        value is a list of all the indexes of the particles in that quadrant.
         r: The interaction radius for each particle.
 
     Returns: A numpy array of 'n' angles that will be used to update the positions
@@ -210,23 +210,24 @@ def average_orientation(pos: np.ndarray, vel: np.ndarray, index: np.ndarray,
     return ao
 
 
-def fill_map(particle_map: List[List[List[int]]], index: np.ndarray) -> List[List[List[int]]]:
+def fill_map(size: int, index: np.ndarray) -> List[List[List[int]]]:
     """
-    Fills in a particle map with the index value of each particle.
-    If the value at position in the map from 'index' is empty, a new
-    array is created with that index as its only element. Otherwise,
-    the index is inserted at the beginning of the exisiting array.
+    Breaks down the simulation square into quadrants (sub-squares)
+    of equal length according to the interaction radius. Creates
+    a 2D list of those quadrants and enters the indexes of each
+    and every particle into their appropriate quadrants.
 
     Args:
-        particle_map: A numpy 2D matrix map of the simulation box where each
-            value is a location quadrant where a group of particles may exist.
+        size: The length of each quadrant (sub-square) of the square.
         index: A numpy array containing the particles' indexes and their
             corresponding position.
 
-    Returns: The given particle map with new indexes filled in.
+    Returns: The 2D list representing the map of the simulation square where each
+        value is a list of all the indexes of the particles in that quadrant.
 
     """
-    for i in range(len(index)):
+    particle_map = [[[] for _ in range(size)] for _ in range(size)]
+    for i in range(index.shape[0]):
         particle_map[index[i, 1].item()][index[i, 2].item()].insert(0, index[i, 0].item())
     return particle_map
 
