@@ -11,8 +11,6 @@ from torch import Tensor
 from typing import Any, Generator, List, Tuple
 
 np.set_printoptions(precision=4)
-torch.Tensor.ndim = property(lambda self: len(self.shape))
-
 if not torch.cuda.is_available():
     raise Exception("CUDA not available to be used for the program.")
 gpu_cuda = torch.device("cuda")
@@ -81,8 +79,9 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int) -> 
     pos, vel = frame_data
     scale = l / 60
 
-    q = ax.quiver(pos[:, 0], pos[:, 1],
-                  torch.mul(torch.cos(vel), scale).flatten(), torch.mul(torch.sin(vel), scale).flatten())
+    q = ax.quiver(pos[:, 0].tolist(), pos[:, 1].tolist(),
+                  torch.mul(torch.cos(vel), scale).flatten().tolist(),
+                  torch.mul(torch.sin(vel), scale).flatten().tolist())
     ax.quiverkey(q, X=0.2, Y=1.1, U=1,
                  label=f"Quiver key - Length = 1. Particles: {pos.shape[0]:,}", labelpos='E')
 

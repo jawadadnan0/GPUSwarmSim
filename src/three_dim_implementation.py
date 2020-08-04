@@ -11,8 +11,6 @@ from torch import Tensor
 from typing import Any, Generator, List, Tuple
 
 np.set_printoptions(precision=4)
-torch.Tensor.ndim = property(lambda self: len(self.shape))
-
 if not torch.cuda.is_available():
     raise Exception("CUDA not available to be used for the program.")
 gpu_cuda = torch.device("cuda")
@@ -83,12 +81,11 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes3D, l: int) -
     pos, vel = frame_data
     scale = l / 60
 
-    q = ax.quiver(pos[:, 0], pos[:, 1], pos[:, 2],
-                  torch.mul(torch.sin(vel[:, 1]) * torch.cos(vel[:, 0]), scale).flatten(),
-                  torch.mul(torch.sin(vel[:, 1]) * torch.sin(vel[:, 0]), scale).flatten(),
-                  torch.mul(torch.cos(vel[:, 1]), scale).flatten())
-    ax.quiverkey(q, X=0.2, Y=1.1, Z=0.3, U=1,
-                 label=f"Quiver key - Length = 1. Particles: {pos.shape[0]:,}", labelpos='E')
+    ax.quiver3D(pos[:, 0].tolist(), pos[:, 1].tolist(), pos[:, 2].tolist(),
+                torch.mul(torch.sin(vel[:, 1]) * torch.cos(vel[:, 0]), scale).flatten().tolist(),
+                torch.mul(torch.sin(vel[:, 1]) * torch.sin(vel[:, 0]), scale).flatten().tolist(),
+                torch.mul(torch.cos(vel[:, 1]), scale).flatten().tolist())
+    ax.set_title(f"Quiver key - Length = 1. Particles: {pos.shape[0]:,}")
 
 
 def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kappa: float) -> \
@@ -137,19 +134,18 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
         target = deepcopy(vel)
         target[torch.where(torch.eq(who[:, 0], 1))] = \
             average_orientation(pos, target, index[torch.where(torch.eq(who[:, 0], 1))], particle_map, r)
-        vel[:, 0][torch.where(torch.eq(who[:, 0], 1))] = \
-            torch.remainder(target[:, 0][torch.where(torch.eq(who[:, 0], 1))] +
-                                von_mises_dist(0, kappa, torch.sum(who).item()),
-                            tensor(2 * np.pi, torch.float)).flatten()
-        vel[:, 1][torch.where(torch.eq(who[:, 0], 1))] = \
-            torch.remainder(target[:, 1][torch.where(torch.eq(who[:, 0], 1))] +
-                                von_mises_dist(0, kappa, torch.sum(who).item()),
-                            tensor(np.pi, torch.float)).flatten()
+        size = torch.sum(who).item()
+        vel[torch.where(torch.eq(who[:, 0], 1))] = \
+            torch.remainder(target[torch.where(torch.eq(who[:, 0], 1))] +
+                            von_mises_dist(0, kappa, (size, 2)),
+                            tensor(2 * np.pi, torch.float))
 
         x = torch.sin(vel[:, 1]) * torch.cos(vel[:, 0])
         y = torch.sin(vel[:, 1]) * torch.sin(vel[:, 0])
         z = torch.cos(vel[:, 1])
-        pos = torch.remainder(pos + torch.mul(torch.cat((x, y, z), 1), dt * scaled_velocity), l)
+        pos = torch.remainder(pos + torch.mul(torch.cat((x.reshape(x.size()[0], 1),
+                                                         y.reshape(y.size()[0], 1),
+                                                         z.reshape(z.size()[0], 1)), 1), dt * scaled_velocity), l)
 
         if t % 10 == 0:
             print(f"Iteration number: {t} (out of {max_iter} iterations) [{(100 * t) // max_iter}% complete]")
@@ -159,7 +155,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
         particle_map = fill_map(int(l / rr), index)
 
 
-def von_mises_dist(theta: float, kappa: float, n: int) -> Tensor:
+def von_mises_dist(theta: float, kappa: float, shape: Tuple[int, int]) -> Tensor:
     """
     Simulates 'n' random angles from a von Mises distribution, with preferred
     direction 'theta' and concentration parameter 'kappa'.
@@ -169,11 +165,13 @@ def von_mises_dist(theta: float, kappa: float, n: int) -> Tensor:
         kappa: The concentration of distribution (the higher the value, the
             more concentrated the data is around 'theta').
             [Note]: small kappa -> uniform distribution.
-        n: The number of random angles to generate.
+        shape: The shape of the Tensor conataining random angles.
 
     Returns: A Tensor of size 'n' with random angle around 'theta'.
 
     """
+    n = shape[0] * shape[1]
+
     if kappa < 1e-6:
         return torch.mul(torch.rand(n, 1, device=gpu_cuda), 2 * np.pi).sub(np.pi)
 
@@ -196,7 +194,7 @@ def von_mises_dist(theta: float, kappa: float, n: int) -> Tensor:
         temp = np.mod(theta + np.sign(u[2] - 0.5) * np.arccos(f), 2 * np.pi)
         alpha[j, 0] = tensor(temp - 2 * np.pi if np.pi < temp <= 2 * np.pi else temp, torch.float)
 
-    return alpha
+    return alpha.reshape(shape)
 
 
 def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
@@ -233,13 +231,13 @@ def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
                                                        for z in third_indexes], []), torch.int64)
         result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1, keepdim=True)
         true_neighbours = neighbours[torch.where(torch.lt(result, r))[0]]
-        target = torch.sum(torch.cat((torch.sin(vel[true_neighbours, 1]) * torch.cos(vel[true_neighbours, 0]),
-                                      torch.sin(vel[true_neighbours, 1]) * torch.sin(vel[true_neighbours, 0]),
-                                      torch.cos(vel[true_neighbours, 1])), 1), 0)
+        x = torch.sin(vel[true_neighbours, 1]) * torch.cos(vel[true_neighbours, 0])
+        y = torch.sin(vel[true_neighbours, 1]) * torch.sin(vel[true_neighbours, 0])
+        z = torch.cos(vel[true_neighbours, 1])
 
         # Calculate the azimuth and inclinations.
-        ao[i, 0] = torch.atan(torch.div(target[1], target[0]))
-        ao[i, 1] = torch.atan(torch.div(torch.sqrt(target[0] * target[0] + target[1] * target[1]), target[2]))
+        ao[i, 0] = torch.atan(torch.div(y.sum(), x.sum()))
+        ao[i, 1] = torch.atan(torch.div(torch.sqrt(x.sum() * x.sum() + y.sum() * y.sum()), z.sum()))
     return ao
 
 
@@ -313,9 +311,9 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
     parser = argparse.ArgumentParser(description="Depicting the movement of several particles in a 3D "
                                                  "space using a combination of CPU and GPU.")
 
-    parser.add_argument("-s", "--save", action="store_true", default=True, help="Save in a File or not.")
+    parser.add_argument("-s", "--save", action="store_true", default=False, help="Save in a File or not.")
     parser.add_argument("-f", "--video_file", type=str, default="quiver_3D.mp4", help="The Video File to Save in")
-    parser.add_argument("-n", "--agents_num", type=int, default=50, help="The Number of Agents")
+    parser.add_argument("-n", "--agents_num", type=int, default=500, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
     parser.add_argument("-t", "--max_iter", type=int, default=10, help="The Total Number of Iterations/Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
