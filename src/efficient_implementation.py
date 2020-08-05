@@ -46,7 +46,7 @@ def main() -> None:
 
     writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
     ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
-                        fargs=(ax, l), interval=30, save_count=int(100 * t * nu) + 1, repeat=False)
+                        fargs=(ax, l, r, v, nu, kappa), interval=30, save_count=int(100 * t * nu) + 1, repeat=False)
 
     if save:
         ani.save(file, writer=writer)
@@ -57,7 +57,8 @@ def main() -> None:
         plt.show()
 
 
-def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int) -> None:
+def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int,
+                        r: float, v: float, nu: float, kappa: float) -> None:
     """
     This function is executed every single time the frame needs to updated
     whether it is to view it in real-time or to save it into a video.
@@ -66,6 +67,10 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int) -> 
         frame_data: A tuple of two Tensors, containing the positions and velocities of the particles.
         ax: The axis object of the plot in order to help set it up.
         l: The length of the square to be drawn that will contain the particles.
+        r: The interaction radius of each particle.
+        v: The max velocity of each particle.
+        nu: The jump rate for each particle.
+        kappa: The concentration parameter for von Mises Distribution.
 
     Returns: None (void function)
 
@@ -82,11 +87,11 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int) -> 
     pos, vel = frame_data
     scale = l / 60
 
-    q = ax.quiver(pos[:, 0].tolist(), pos[:, 1].tolist(),
+    ax.quiver(pos[:, 0].tolist(), pos[:, 1].tolist(),
                   torch.mul(torch.cos(vel), scale).flatten().tolist(),
                   torch.mul(torch.sin(vel), scale).flatten().tolist())
-    ax.quiverkey(q, X=0.2, Y=1.1, U=0.1,
-                 label=f"Quiver key: Length = 0.1 - Particles: {pos.shape[0]:,}", labelpos='E')
+    ax.set_title(f"Particles = {pos.shape[0]:,}, Interaction Radius = {r}, Velocity = {v},\n"
+                 f"Jump Rate = {nu}, Concentration Parameter = {kappa}", fontsize="small")
 
 
 def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kappa: float) -> \
@@ -120,11 +125,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     #     Max Iteration: {max_iter}
     #     Scaled Velocity of Particles: {scaled_velocity}
     #     Scale: {scale}
-    #     Scaled Interaction Radius: {rr}
-    #     Positions of the Particles:
-    #     {pos}
-    #     Direction of the Motion of Particles:
-    #     {vel}""")
+    #     Scaled Interaction Radius: {rr}""")
 
     index = index_map(pos, rr)
     particle_map = fill_map(int(l / rr), index)
@@ -299,7 +300,7 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
                         help="The Video File to Save in")
     parser.add_argument("-n", "--agents_num", type=int, default=100000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
-    parser.add_argument("-t", "--max_iter", type=int, default=10, help="The Total Number of Iterations/Seconds")
+    parser.add_argument("-t", "--max_iter", type=int, default=20, help="The Total Number of Iterations/Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
     parser.add_argument("-v", "--particle_velocity", type=float, default=0.02, help="The Velocity of the Particles")
     parser.add_argument("-nu", "--jump_rate", type=float, default=0.3, help="The Jump Rate")
