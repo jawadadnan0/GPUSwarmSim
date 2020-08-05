@@ -39,7 +39,10 @@ def main() -> None:
     #     Initial Particle velocity: {v}
     #     Jump Rate: {nu}
     #     Concentration Parameter: {kappa}""")
-    current_time = datetime.now()
+    start = torch.cuda.Event(enable_timing=True)
+    end = torch.cuda.Event(enable_timing=True)
+
+    start.record(None)
     fig = plt.figure(dpi=200)
     ax = fig.gca(projection="3d")
 
@@ -49,7 +52,9 @@ def main() -> None:
 
     if save:
         ani.save(file, writer=writer)
-        print("[100% Complete] Time taken:", (datetime.now() - current_time).seconds, "seconds")
+        end.record(None)
+        torch.cuda.synchronize()
+        print("[100% Complete] Time taken:", start.elapsed_time(end) // 1000, "seconds")
     else:
         plt.show()
 
