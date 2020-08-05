@@ -167,9 +167,7 @@ def von_mises_dist(theta: float, kappa: float, n: int) -> np.ndarray:
             if u[1] < c * (2 - c) or not (np.log(c) - np.log(u[1]) + 1 - c < 0):
                 break
 
-        alpha[j, 0] = np.mod(theta + np.sign(u[2] - 0.5) * np.arccos(f), 2 * np.pi)
-        alpha[j, 0] = alpha[j, 0] - 2 * np.pi if np.pi < alpha[j, 0] <= 2 * np.pi else alpha[j, 0]
-
+        alpha[j, 0] = theta + np.sign(u[2] - 0.5) * np.arccos(f)
     return alpha
 
 
