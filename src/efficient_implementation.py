@@ -39,9 +39,11 @@ def main() -> None:
     #     Initial Particle velocity: {v}
     #     Jump Rate: {nu}
     #     Concentration Parameter: {kappa}""")
+    start = torch.cuda.Event(enable_timing=True)
+    end = torch.cuda.Event(enable_timing=True)
 
-    current_time = datetime.now()
-    fig, ax = plt.subplots(dpi=600)
+    start.record(None)
+    fig, ax = plt.subplots(dpi=300)
 
     writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
     ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
@@ -49,7 +51,9 @@ def main() -> None:
 
     if save:
         ani.save(file, writer=writer)
-        print("[100% Complete] Time taken:", (datetime.now() - current_time).seconds, "seconds")
+        end.record(None)
+        torch.cuda.synchronize()
+        print("[100% Complete] Time taken:", start.elapsed_time(end) // 1000, "seconds")
     else:
         plt.show()
 
@@ -82,8 +86,8 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int) -> 
     q = ax.quiver(pos[:, 0].tolist(), pos[:, 1].tolist(),
                   torch.mul(torch.cos(vel), scale).flatten().tolist(),
                   torch.mul(torch.sin(vel), scale).flatten().tolist())
-    ax.quiverkey(q, X=0.2, Y=1.1, U=1,
-                 label=f"Quiver key - Length = 1. Particles: {pos.shape[0]:,}", labelpos='E')
+    ax.quiverkey(q, X=0.2, Y=1.1, U=0.1,
+                 label=f"Quiver key: Length = 0.1 - Particles: {pos.shape[0]:,}", labelpos='E')
 
 
 def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kappa: float) -> \
@@ -131,13 +135,11 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
         who = torch.where(torch.gt(jump, torch.exp(tensor(-nu * dt, torch.float))),
                           tensor(1, torch.int64),
                           tensor(0, torch.int64))
+        condition = torch.where(torch.eq(who[:, 0], 1))
+
         target = deepcopy(vel)
-        target[torch.where(torch.eq(who[:, 0], 1))] = \
-            average_orientation(pos, target, index[torch.where(torch.eq(who[:, 0], 1))], particle_map, r)
-        vel[torch.where(torch.eq(who[:, 0], 1))] = \
-            torch.remainder(target[torch.where(torch.eq(who[:, 0], 1))] +
-                            von_mises_dist(0, kappa, torch.sum(who).item()),
-                            tensor(2 * np.pi, torch.float))
+        target[condition] = average_orientation(pos, target, index[condition], particle_map, r)
+        vel[condition] = torch.remainder(target[condition] + von_mises_dist(0, kappa, torch.sum(who).item()), 2 * np.pi)
         pos = torch.remainder(pos + torch.mul(torch.cat((torch.cos(vel), torch.sin(vel)), 1), dt * scaled_velocity), l)
 
         if t % 10 == 0:
@@ -243,7 +245,7 @@ def fill_map(size: int, index: Tensor) -> List[List[List[int]]]:
     """
     particle_map = [[[] for _ in range(size)] for _ in range(size)]
     for i in range(index.size()[0]):
-        particle_map[index[i, 1].item()][index[i, 2].item()].insert(0, index[i, 0].item())
+        particle_map[index[i, 1].item() % size][index[i, 2].item() % size].insert(0, index[i, 0].item())
     return particle_map
 
 
@@ -299,8 +301,8 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
     parser.add_argument("-f", "--video_file", type=str, default="quiver_efficient.mp4",
                         help="The Video File to Save in")
     parser.add_argument("-n", "--agents_num", type=int, default=100000, help="The Number of Agents")
-    parser.add_argument("-l", "--box_size", type=int, default=100, help="The Size of the Box (Periodic Spatial Domain)")
-    parser.add_argument("-t", "--max_iter", type=int, default=60, help="The Total Number of Iterations/Seconds")
+    parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
+    parser.add_argument("-t", "--max_iter", type=int, default=10, help="The Total Number of Iterations/Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
     parser.add_argument("-v", "--particle_velocity", type=float, default=0.02, help="The Velocity of the Particles")
     parser.add_argument("-nu", "--jump_rate", type=float, default=0.3, help="The Jump Rate")

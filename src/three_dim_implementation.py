@@ -130,15 +130,13 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
         who = torch.where(torch.gt(jump, torch.exp(tensor(-nu * dt, torch.float))),
                           tensor(1, torch.int64),
                           tensor(0, torch.int64))
+        condition = torch.where(torch.eq(who[:, 0], 1))
 
         target = deepcopy(vel)
-        target[torch.where(torch.eq(who[:, 0], 1))] = \
-            average_orientation(pos, target, index[torch.where(torch.eq(who[:, 0], 1))], particle_map, r)
-        size = torch.sum(who).item()
-        vel[torch.where(torch.eq(who[:, 0], 1))] = \
-            torch.remainder(target[torch.where(torch.eq(who[:, 0], 1))] +
-                            von_mises_dist(0, kappa, (size, 2)),
-                            tensor(2 * np.pi, torch.float))
+        target[condition] = average_orientation(pos, target, index[condition], particle_map, r)
+        vel[condition] = target[condition] + von_mises_dist(0, kappa, (torch.sum(who).item(), 2))
+        vel[:, 0][condition] = torch.remainder(vel[:, 0][condition], 2 * np.pi)
+        vel[:, 1][condition] = torch.remainder(vel[:, 1][condition], np.pi)
 
         x = torch.sin(vel[:, 1]) * torch.cos(vel[:, 0])
         y = torch.sin(vel[:, 1]) * torch.sin(vel[:, 0])

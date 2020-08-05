@@ -73,8 +73,8 @@ def update_quiver_frame(frame_data: Tuple[np.ndarray, np.ndarray], ax: Axes, l: 
 
     q = ax.quiver(pos[:, 0].transpose(), pos[:, 1].transpose(),
                   (scale * np.cos(vel)).flatten(), (scale * np.sin(vel)).flatten())
-    ax.quiverkey(q, X=0.2, Y=1.1, U=1,
-                 label=f"Quiver key - Length = 1. Particles: {pos.shape[0]:,}", labelpos='E')
+    ax.quiverkey(q, X=0.2, Y=1.1, U=0.1,
+                 label=f"Quiver key: Length = 0.1 - Particles: {pos.shape[0]:,}", labelpos='E')
 
 
 def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kappa: float) -> \
@@ -118,11 +118,11 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     for t in range(max_iter + 1):
         jump = random.uniform(size=(n, 1))
         who = np.where(jump > np.exp(-nu * dt), 1, 0)
+        condition = np.where(who[:, 0] == 1)
+
         target = deepcopy(vel)
-        target[np.where(who[:, 0] == 1)] = \
-            average_orientation(pos, target, index[np.where(who[:, 0] == 1)], particle_map, r)
-        vel[np.where(who[:, 0] == 1)] = \
-            np.mod(target[np.where(who[:, 0] == 1)] + von_mises_dist(0, kappa, who.sum()), 2 * np.pi)
+        target[condition] = average_orientation(pos, target, index[condition], particle_map, r)
+        vel[condition] = np.mod(target[condition] + von_mises_dist(0, kappa, who.sum()), 2 * np.pi)
         pos = np.mod(pos + dt * scaled_velocity * np.c_[np.cos(vel), np.sin(vel)], l)
 
         if t % 10 == 0:
@@ -267,7 +267,7 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
     parser.add_argument("-s", "--save", action="store_true", default=False, help="Save in a File or not.")
     parser.add_argument("-f", "--video_file", type=str, default="quiver_basic.mp4", help="The Video File to Save in")
     parser.add_argument("-n", "--agents_num", type=int, default=10000, help="The Number of Agents")
-    parser.add_argument("-l", "--box_size", type=int, default=10, help="The Size of the Box (Periodic Spatial Domain)")
+    parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
     parser.add_argument("-t", "--max_iter", type=int, default=60, help="The Total Number of Iterations/Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
     parser.add_argument("-v", "--particle_velocity", type=float, default=0.02, help="The Velocity of the Particles")
