@@ -6,7 +6,7 @@ from datetime import datetime
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
 from matplotlib.axes import Axes
-from typing import Any, Generator, List, Tuple
+from typing import Generator, List, Tuple
 
 np.set_printoptions(precision=4)
 

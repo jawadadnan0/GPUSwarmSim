@@ -3,7 +3,6 @@ import numpy as np
 import torch
 
 from copy import deepcopy
-from datetime import datetime
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
 from matplotlib.axes import Axes
