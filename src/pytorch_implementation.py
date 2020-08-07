@@ -3,7 +3,6 @@ import numpy as np
 import torch
 
 from copy import deepcopy
-from datetime import datetime
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
 from matplotlib.axes import Axes
@@ -28,7 +27,10 @@ def main():
     #     Jump Rate: {nu}
     #     Concentration Parameter: {kappa}""")
 
-    current_time = datetime.now()
+    start = torch.cuda.Event(enable_timing=True)
+    end = torch.cuda.Event(enable_timing=True)
+
+    start.record(None)
     fig, ax = plt.subplots(dpi=200)
 
     writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
@@ -38,7 +40,9 @@ def main():
 
     if save:
         ani.save(file, writer=writer)
-        print("[100% Complete] Time taken:", (datetime.now() - current_time).seconds, "seconds")
+        end.record(None)
+        torch.cuda.synchronize()
+        print("[100% Complete] Time taken:", start.elapsed_time(end) // 1000, "seconds")
     else:
         plt.show()
 
