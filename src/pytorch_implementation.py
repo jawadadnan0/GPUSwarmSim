@@ -27,6 +27,7 @@ def main():
     #     Initial Particle velocity: {v}
     #     Jump Rate: {nu}
     #     Concentration Parameter: {kappa}""")
+
     current_time = datetime.now()
     fig, ax = plt.subplots(dpi=200)
 
@@ -54,9 +55,9 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int,
     pos, vel = frame_data
     scale = l / 60
 
-    q = ax.quiver(pos[:, 0].tolist(), pos[:, 1].tolist(),
-                  torch.mul(torch.cos(vel), scale).flatten().tolist(),
-                  torch.mul(torch.sin(vel), scale).flatten().tolist())
+    ax.quiver(pos[:, 0].tolist(), pos[:, 1].tolist(),
+              torch.mul(torch.cos(vel), scale).flatten().tolist(),
+              torch.mul(torch.sin(vel), scale).flatten().tolist())
     ax.set_title(f"Particles = {pos.size()[0]:,}, Interaction Radius = {r}, Velocity = {v},\n"
                  f"Jump Rate = {nu}, Concentration Parameter = {kappa}", fontsize="small")
 
@@ -80,7 +81,7 @@ def process_particles(n: int, l: Tensor, t: Tensor, r: Tensor, v: Tensor, nu: Te
     #     {pos}
     #     Direction of the Motion of Particles:
     #     {vel}""")
-    dim = torch.round(l / rr).to(torch.int64).item()
+    dim = torch.floor(l / rr).to(torch.int64).item()
 
     index = index_map(pos, rr)
     particle_map = fill_map(dim, index)
@@ -139,8 +140,8 @@ def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
     n = index.size()[0]
     ao = torch.zeros(n, 1, device=gpu_cuda)
     for i in range(n):
-        first_indexes = [(index[i, 1].item() - 1) % k, index[i, 1].item() % k, (index[i, 1].item() + 1) % k]
-        second_indexes = [(index[i, 2].item() - 1) % k, index[i, 2].item() % k, (index[i, 2].item() + 1) % k]
+        first_indexes = [(index[i, 1].item() + j) % k for j in range(-1, 2)]
+        second_indexes = [(index[i, 2].item() + j) % k for j in range(-1, 2)]
 
         neighbours = tensor(sum([particle_map[x][y] for x in first_indexes for y in second_indexes], []), torch.int64)
         result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1)
