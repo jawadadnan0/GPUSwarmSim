@@ -28,7 +28,7 @@ def main() -> None:
 
     """
     save, file, n, l, t, r, v, nu, kappa = parse_args()
-    # print(file"""Hyperparameters:-
+    # print(f"""Hyperparameters:-
     #     Save to File: {save}
     #     Save File Name: {file}
     #     Number of Particles: {n}
@@ -38,6 +38,7 @@ def main() -> None:
     #     Initial Particle velocity: {v}
     #     Jump Rate: {nu}
     #     Concentration Parameter: {kappa}""")
+
     start = torch.cuda.Event(enable_timing=True)
     end = torch.cuda.Event(enable_timing=True)
 

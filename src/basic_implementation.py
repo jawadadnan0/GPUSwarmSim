@@ -77,8 +77,7 @@ def update_quiver_frame(frame_data: Tuple[np.ndarray, np.ndarray], ax: Axes, l: 
     pos, vel = frame_data
     scale = l / 60
 
-    ax.quiver(pos[:, 0].transpose(), pos[:, 1].transpose(),
-              (scale * np.cos(vel)).flatten(), (scale * np.sin(vel)).flatten())
+    ax.quiver(pos[:, 0], pos[:, 1], scale * np.cos(vel), scale * np.sin(vel))
     ax.set_title(f"Particles = {pos.shape[0]:,}, Interaction Radius = {r}, Velocity = {v},\n"
                  f"Jump Rate = {nu}, Concentration Parameter = {kappa}", fontsize="small")
 
@@ -269,7 +268,7 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
 
     parser.add_argument("-s", "--save", action="store_true", default=False, help="Save in a File or not.")
     parser.add_argument("-f", "--video_file", type=str, default="quiver_basic.mp4", help="The Video File to Save in")
-    parser.add_argument("-n", "--agents_num", type=int, default=100000, help="The Number of Agents")
+    parser.add_argument("-n", "--agents_num", type=int, default=10000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
     parser.add_argument("-t", "--max_iter", type=int, default=60, help="The Total Number of Iterations/Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
