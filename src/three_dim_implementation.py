@@ -94,7 +94,7 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes3D, l: int,
                 torch.mul(torch.sin(vel[:, 1]) * torch.cos(vel[:, 0]), scale).flatten().tolist(),
                 torch.mul(torch.sin(vel[:, 1]) * torch.sin(vel[:, 0]), scale).flatten().tolist(),
                 torch.mul(torch.cos(vel[:, 1]), scale).flatten().tolist())
-    ax.set_title(f"Particles = {pos.shape[0]:,}, Interaction Radius = {r}, Velocity = {v},\n"
+    ax.set_title(f"Particles = {pos.size()[0]:,}, Interaction Radius = {r}, Velocity = {v},\n"
                  f"Jump Rate = {nu}, Concentration Parameter = {kappa}", fontsize="small")
 
 
@@ -178,10 +178,10 @@ def von_mises_dist(theta: float, kappa: float, shape: Tuple[int, int]) -> Tensor
     Returns: A Tensor of size 'n' with random angle around 'theta'.
 
     """
-    n = shape[0] * shape[1]
-
     if kappa < 1e-6:
-        return torch.mul(torch.rand(n, 1, device=gpu_cuda), 2 * np.pi).sub(np.pi)
+        return torch.mul(torch.rand(*shape, device=gpu_cuda), 2 * np.pi).sub(np.pi)
+
+    n = shape[0] * shape[1]
 
     a = 1 + np.sqrt(1 + 4 * kappa ** 2)
     b = (a - np.sqrt(2 * a)) / (2 * kappa)
@@ -235,15 +235,15 @@ def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
         neighbours = tensor(sum([particle_map[x][y][z] for x in first_indexes
                                                        for y in second_indexes
                                                        for z in third_indexes], []), torch.int64)
-        result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1, keepdim=True)
-        true_neighbours = neighbours[torch.where(torch.lt(result, r))[0]]
-        x = torch.sin(vel[true_neighbours, 1]) * torch.cos(vel[true_neighbours, 0])
-        y = torch.sin(vel[true_neighbours, 1]) * torch.sin(vel[true_neighbours, 0])
-        z = torch.cos(vel[true_neighbours, 1])
+        result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1)
+        true_neighbours = neighbours[torch.where(torch.lt(result, r))]
+        x = torch.sum(torch.sin(vel[true_neighbours, 1]) * torch.cos(vel[true_neighbours, 0]))
+        y = torch.sum(torch.sin(vel[true_neighbours, 1]) * torch.sin(vel[true_neighbours, 0]))
+        z = torch.sum(torch.cos(vel[true_neighbours, 1]))
 
         # Calculate the azimuth and inclinations.
-        ao[i, 0] = torch.atan(torch.div(y.sum(), x.sum()))
-        ao[i, 1] = torch.atan(torch.div(torch.sqrt(x.sum() * x.sum() + y.sum() * y.sum()), z.sum()))
+        ao[i, 0] = torch.atan(torch.div(y, x))
+        ao[i, 1] = torch.atan(torch.div(torch.sqrt(x * x + y * y), z))
     return ao
 
 
@@ -263,7 +263,7 @@ def fill_map(size: int, index: Tensor) -> List[List[List[List[int]]]]:
         value is a list of all the indexes of the particles in that quadrant.
 
     """
-    particle_map = [[[[] for _ in range(int(size))] for _ in range(int(size))] for _ in range(int(size))]
+    particle_map = [[[[] for _ in range(size)] for _ in range(size)] for _ in range(size)]
     for i in range(index.size()[0]):
         particle_map[index[i, 1].item()][index[i, 2].item()][index[i, 3].item()].insert(0, index[i, 0].item())
     return particle_map

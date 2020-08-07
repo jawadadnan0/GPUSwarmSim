@@ -88,9 +88,9 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int,
     scale = l / 60
 
     ax.quiver(pos[:, 0].tolist(), pos[:, 1].tolist(),
-                  torch.mul(torch.cos(vel), scale).flatten().tolist(),
-                  torch.mul(torch.sin(vel), scale).flatten().tolist())
-    ax.set_title(f"Particles = {pos.shape[0]:,}, Interaction Radius = {r}, Velocity = {v},\n"
+              torch.mul(torch.cos(vel), scale).flatten().tolist(),
+              torch.mul(torch.sin(vel), scale).flatten().tolist())
+    ax.set_title(f"Particles = {pos.size()[0]:,}, Interaction Radius = {r}, Velocity = {v},\n"
                  f"Jump Rate = {nu}, Concentration Parameter = {kappa}", fontsize="small")
 
 
@@ -217,8 +217,8 @@ def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
         second_indexes = [(index[i, 2].item() + j) % k for j in range(-1, 2)]
 
         neighbours = tensor(sum([particle_map[x][y] for x in first_indexes for y in second_indexes], []), torch.int64)
-        result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1, keepdim=True)
-        true_neighbours = neighbours[torch.where(torch.lt(result, r))[0]]
+        result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1)
+        true_neighbours = neighbours[torch.where(torch.lt(result, r))]
 
         target = torch.sum(torch.cat((torch.sin(vel[true_neighbours]), torch.cos(vel[true_neighbours])), 1), 0)
         ao[i, 0] = torch.atan(torch.div(target[1], target[0]))  # Calculates the angle

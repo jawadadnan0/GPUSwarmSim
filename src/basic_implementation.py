@@ -201,12 +201,12 @@ def average_orientation(pos: np.ndarray, vel: np.ndarray, index: np.ndarray,
     n = index.shape[0]
     ao = np.zeros(shape=(n, 1))
     for i in range(n):
-        first_indexes = [(index[i, 1].item() + j) % k for j in range(-1, 2)]
-        second_indexes = [(index[i, 2].item() + j) % k for j in range(-1, 2)]
+        first_indexes = [(index[i, 1] + j) % k for j in range(-1, 2)]
+        second_indexes = [(index[i, 2] + j) % k for j in range(-1, 2)]
 
         neighbours = np.array(sum([particle_map[x][y] for x in first_indexes for y in second_indexes], []))
-        result = np.linalg.norm(pos[neighbours, :] - pos[index[i, 0], :], ord=2, axis=1, keepdims=True)
-        true_neighbours = neighbours[np.where(result < r)[0]]
+        result = np.linalg.norm(pos[neighbours, :] - pos[index[i, 0], :], ord=2, axis=1)
+        true_neighbours = neighbours[np.where(result < r)]
 
         target = np.sum(np.c_[np.sin(vel[true_neighbours]), np.cos(vel[true_neighbours])], axis=0)
         ao[i, 0] = np.arctan(target[1] / target[0])
@@ -231,7 +231,7 @@ def fill_map(size: int, index: np.ndarray) -> List[List[List[int]]]:
     """
     particle_map = [[[] for _ in range(size)] for _ in range(size)]
     for i in range(index.shape[0]):
-        particle_map[index[i, 1].item()][index[i, 2].item()].insert(0, index[i, 0].item())
+        particle_map[index[i, 1]][index[i, 2]].insert(0, index[i, 0])
     return particle_map
 
 
@@ -269,7 +269,7 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
 
     parser.add_argument("-s", "--save", action="store_true", default=False, help="Save in a File or not.")
     parser.add_argument("-f", "--video_file", type=str, default="quiver_basic.mp4", help="The Video File to Save in")
-    parser.add_argument("-n", "--agents_num", type=int, default=10000, help="The Number of Agents")
+    parser.add_argument("-n", "--agents_num", type=int, default=100000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
     parser.add_argument("-t", "--max_iter", type=int, default=60, help="The Total Number of Iterations/Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
