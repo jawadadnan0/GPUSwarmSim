@@ -24,16 +24,17 @@ def main() -> None:
 
     """
     save, file, n, l, t, r, v, nu, kappa = parse_args()
-    # print(file"""Hyperparameters:-
-    #     Save to File: {save}
-    #     Save File Name: {file}
-    #     Number of Particles: {n}
-    #     Periodic Spatial Domain: {l}
-    #     Total No. of Iterations: {t}
-    #     Interaction Radius: {r}
-    #     Initial Particle velocity: {v}
-    #     Jump Rate: {nu}
-    #     Concentration Parameter: {kappa}""")
+    print(f"""Hyperparameters:-
+        Save to File: {save}
+        Save File Name: {file}
+        Number of Particles: {n}
+        Periodic Spatial Domain: {l}
+        Total No. of Iterations: {t}
+        Interaction Radius: {r}
+        Initial Particle velocity: {v}
+        Jump Rate: {nu}
+        Concentration Parameter: {kappa}""")
+
     current_time = datetime.now()
     fig, ax = plt.subplots(dpi=300)
 
@@ -110,12 +111,11 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     pos = l * random.uniform(size=(n, 2))
     vel = 2 * np.pi * random.uniform(size=(n, 1))
 
-    # print(f"""Calculated Parameters:-
-    #     Time Discretisation Step: {dt}
-    #     Max Iteration: {max_iter}
-    #     Scaled Velocity of Particles: {scaled_velocity}
-    #     Scale: {scale}
-    #     Scaled Interaction Radius: {rr}""")
+    print(f"""Calculated Parameters:-
+        Time Discretisation Step: {dt}
+        Max Iteration: {max_iter}
+        Scaled Velocity of Particles: {scaled_velocity}
+        Scaled Interaction Radius: {rr}""")
 
     index = index_map(pos, rr)
     particle_map = fill_map(int(l / rr), index)
