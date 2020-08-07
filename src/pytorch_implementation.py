@@ -32,7 +32,8 @@ def main():
 
     writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
     ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
-                        fargs=(ax, l.item()), interval=30, save_count=int(100 * t.item() * nu.item()) + 1, repeat=False)
+                        fargs=(ax, l.item(), r.item(), v.item(), nu.item(), kappa.item()),
+                        interval=30, save_count=int(100 * (t * nu).item()) + 1, repeat=False)
 
     if save:
         ani.save(file, writer=writer)
@@ -41,7 +42,8 @@ def main():
         plt.show()
 
 
-def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int) -> None:
+def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int,
+                        r: float, v: float, nu: float, kappa: float) -> None:
     ax.clear()
     sep = l / 10
     ax.set_xticks(np.arange(0, l + sep, sep))
@@ -55,7 +57,8 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int) -> 
     q = ax.quiver(pos[:, 0].tolist(), pos[:, 1].tolist(),
                   torch.mul(torch.cos(vel), scale).flatten().tolist(),
                   torch.mul(torch.sin(vel), scale).flatten().tolist())
-    ax.quiverkey(q, X=0.3, Y=1.1, U=0.05, label='Quiver key, length = 0.05', labelpos='E')
+    ax.set_title(f"Particles = {pos.size()[0]:,}, Interaction Radius = {r}, Velocity = {v},\n"
+                 f"Jump Rate = {nu}, Concentration Parameter = {kappa}", fontsize="small")
 
 
 def process_particles(n: int, l: Tensor, t: Tensor, r: Tensor, v: Tensor, nu: Tensor, kappa: Tensor) -> \
@@ -77,22 +80,21 @@ def process_particles(n: int, l: Tensor, t: Tensor, r: Tensor, v: Tensor, nu: Te
     #     {pos}
     #     Direction of the Motion of Particles:
     #     {vel}""")
-
     dim = torch.round(l / rr).to(torch.int64).item()
-    particle_map = np.full((dim, dim), np.nan).astype(np.object)
+
     index = index_map(pos, rr)
-    particle_map = fill_map(particle_map, index)
+    particle_map = fill_map(dim, index)
 
     for t in range(max_iter):
         jump = torch.rand(n, 1, device=gpu_cuda)
         who = torch.where(torch.gt(jump, torch.exp(-nu * dt)), tensor(1, torch.int64), tensor(0, torch.int64))
+        condition = torch.where(torch.eq(who[:, 0], 1))
+
         target = deepcopy(vel)
-        target[torch.where(torch.eq(who[:, 0], 1))] = \
-            average_orientation(pos, target, index[torch.where(torch.eq(who[:, 0], 1))], particle_map, r)
-        vel[torch.where(torch.eq(who[:, 0], 1))] = \
-            torch.remainder(target[torch.where(torch.eq(who[:, 0], 1))] +
-                                von_mises_dist(tensor(0, torch.float), kappa, torch.sum(who).item()),
-                            tensor(2 * np.pi, torch.float))
+        target[condition] = average_orientation(pos, target, index[condition], particle_map, r)
+        vel[condition] = torch.remainder(target[condition] +
+                                            von_mises_dist(tensor(0, torch.float), kappa, torch.sum(who).item()),
+                                         tensor(2 * np.pi, torch.float))
         pos = torch.remainder(pos + dt * scaled_velocity * torch.cat((torch.cos(vel), torch.sin(vel)), 1), l)
 
         if t % 10 == 0:
@@ -100,8 +102,7 @@ def process_particles(n: int, l: Tensor, t: Tensor, r: Tensor, v: Tensor, nu: Te
             yield pos, vel
 
         index = index_map(pos, rr)
-        particle_map = np.full((dim, dim), np.nan).astype(np.object)
-        particle_map = fill_map(particle_map, index)
+        particle_map = fill_map(dim, index)
 
 
 def von_mises_dist(theta: Tensor, kappa: Tensor, n: int) -> Tensor:
@@ -129,46 +130,31 @@ def von_mises_dist(theta: Tensor, kappa: Tensor, n: int) -> Tensor:
 
         alpha[j, 0] = torch.remainder(theta + torch.sign(u[2] - tensor(0.5, torch.float)) * torch.acos(f),
                                       tensors[2] * pi)
-        alpha[j, 0] = alpha[j, 0] - tensors[2] * pi if pi < alpha[j, 0] <= tensors[2] * pi else alpha[j, 0]
-
     return alpha
 
 
 def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
-                        particle_map: np.ndarray, r: Tensor) -> Tensor:
-    k = particle_map.shape[0]
+                        particle_map: List[List[List[int]]], r: Tensor) -> Tensor:
+    k = len(particle_map)
     n = index.size()[0]
     ao = torch.zeros(n, 1, device=gpu_cuda)
     for i in range(n):
         first_indexes = [(index[i, 1].item() - 1) % k, index[i, 1].item() % k, (index[i, 1].item() + 1) % k]
         second_indexes = [(index[i, 2].item() - 1) % k, index[i, 2].item() % k, (index[i, 2].item() + 1) % k]
 
-        neighbours = flatten([[particle_map[x, y] for x in first_indexes] for y in second_indexes])
-        result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1, keepdim=True)
-        true_neighbours = neighbours[torch.where(torch.lt(result, r))[0]]
+        neighbours = tensor(sum([particle_map[x][y] for x in first_indexes for y in second_indexes], []), torch.int64)
+        result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1)
+        true_neighbours = neighbours[torch.where(torch.lt(result, r))]
 
         target = torch.sum(torch.cat((torch.sin(vel[true_neighbours]), torch.cos(vel[true_neighbours])), 1), 0)
         ao[i, 0] = torch.atan(target[1] / target[0])  # angle
     return ao
 
 
-def flatten(array_matrix: List[List[Any]]) -> Tensor:
-    result = []
-    for x in range(len(array_matrix)):
-        for y in range(len(array_matrix[0])):
-            try:
-                result += list(array_matrix[x][y])
-            except TypeError:
-                result += [array_matrix[x][y]]
-    return tensor([e for e in result if not np.isnan(e)], torch.int64)
-
-
-def fill_map(particle_map: np.ndarray, index: Tensor) -> np.ndarray:
+def fill_map(size: int, index: Tensor) -> List[List[List[int]]]:
+    particle_map = [[[] for _ in range(size)] for _ in range(size)]
     for i in range(index.size()[0]):
-        if np.all(np.isnan(particle_map[index[i, 1], index[i, 2]])):
-            particle_map[index[i, 1], index[i, 2]] = [index[i, 0].item()]
-        else:
-            particle_map[index[i, 1], index[i, 2]] = np.r_[index[i, 0].item(), particle_map[index[i, 1], index[i, 2]]]
+        particle_map[index[i, 1].item() % size][index[i, 2].item() % size].insert(0, index[i, 0].item())
     return particle_map
 
 
