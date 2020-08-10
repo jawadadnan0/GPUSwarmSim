@@ -43,8 +43,7 @@ def main() -> None:
     end = torch.cuda.Event(enable_timing=True)
 
     start.record(None)
-    fig = plt.figure(dpi=200)
-    ax = fig.gca(projection="3d")
+    fig, ax = plt.subplots(dpi=300, subplot_kw=dict(projection="3d"))
 
     writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
     ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
@@ -199,6 +198,7 @@ def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
                                                        for z in third_indexes], []), torch.int64)
         result = torch.norm(pos[neighbours, :] - pos[index[i, 0], :], p=2, dim=1)
         true_neighbours = neighbours[torch.where(torch.lt(result, r))]
+
         x = torch.sum(torch.sin(vel[true_neighbours, 1]) * torch.cos(vel[true_neighbours, 0]))
         y = torch.sum(torch.sin(vel[true_neighbours, 1]) * torch.sin(vel[true_neighbours, 0]))
         z = torch.sum(torch.cos(vel[true_neighbours, 1]))
@@ -227,7 +227,7 @@ def fill_map(size: int, index: Tensor) -> List[List[List[List[int]]]]:
     """
     particle_map = [[[[] for _ in range(size)] for _ in range(size)] for _ in range(size)]
     for i in range(index.size()[0]):
-        particle_map[index[i, 1].item()][index[i, 2].item()][index[i, 3].item()].insert(0, index[i, 0].item())
+        particle_map[index[i, 1].item()][index[i, 2].item()][index[i, 3].item()].append(index[i, 0].item())
     return particle_map
 
 

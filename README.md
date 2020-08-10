@@ -85,7 +85,7 @@ performance does suffer. This is the FINAL SUBMISSION of the code.
 
 iv) `src/three_dim_implementation.py`: This implementation is where the
 algorithm from `src/efficient_implementation.py` is applied to a 3D space
-and plotted on a 3D Axes. The code is HIGHLY UNSTABLE and seems to crash
-once in a while due to Tensor size issues. This is meant to be the final
-version of the code which takes care of all the possible dimensions of
-a particle not just two dimensions.
+and plotted on a 3D Axes. The code is WORKING (BUT LAGGY) due to the 
+addition of an extra dimension. This is meant to be the final version
+of the code which takes care of all the possible dimensions of a particle
+not just two dimensions.

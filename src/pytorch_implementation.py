@@ -130,7 +130,7 @@ def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
 def fill_map(size: int, index: Tensor) -> List[List[List[int]]]:
     particle_map = [[[] for _ in range(size)] for _ in range(size)]
     for i in range(index.size()[0]):
-        particle_map[index[i, 1].item()][index[i, 2].item()].insert(0, index[i, 0].item())
+        particle_map[index[i, 1].item()][index[i, 2].item()].append(index[i, 0].item())
     return particle_map
 
 

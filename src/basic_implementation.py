@@ -192,7 +192,7 @@ def fill_map(size: int, index: np.ndarray) -> List[List[List[int]]]:
     """
     particle_map = [[[] for _ in range(size)] for _ in range(size)]
     for i in range(index.shape[0]):
-        particle_map[index[i, 1]][index[i, 2]].insert(0, index[i, 0])
+        particle_map[index[i, 1]][index[i, 2]].append(index[i, 0])
     return particle_map
 
 
