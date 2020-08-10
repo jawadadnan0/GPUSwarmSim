@@ -116,8 +116,6 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
 
     """
     von_mises = VonMises(tensor(0, torch.float), tensor(kappa, torch.float))
-    angles = von_mises.sample((n, 1))
-    print(angles)
 
     dt = 0.01 / nu
     max_iter = int(t / dt) * 5
