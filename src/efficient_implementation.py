@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
 from matplotlib.axes import Axes
 from torch import Tensor
+from torch.distributions.von_mises import VonMises
 from typing import Any, Generator, List, Tuple
 
 np.set_printoptions(precision=4)
@@ -28,16 +29,16 @@ def main() -> None:
 
     """
     save, file, n, l, t, r, v, nu, kappa = parse_args()
-    # print(f"""Hyperparameters:-
-    #     Save to File: {save}
-    #     Save File Name: {file}
-    #     Number of Particles: {n}
-    #     Periodic Spatial Domain: {l}
-    #     Total No. of Iterations: {t}
-    #     Interaction Radius: {r}
-    #     Initial Particle velocity: {v}
-    #     Jump Rate: {nu}
-    #     Concentration Parameter: {kappa}""")
+    print(f"""Hyperparameters:-
+        Save to File: {save}
+        Save File Name: {file}
+        Number of Particles: {n}
+        Periodic Spatial Domain: {l}
+        Simulation Length (in Seconds): {t}
+        Interaction Radius: {r}
+        Initial Particle velocity: {v}
+        Jump Rate: {nu}
+        Concentration Parameter: {kappa}""")
 
     start = torch.cuda.Event(enable_timing=True)
     end = torch.cuda.Event(enable_timing=True)
@@ -47,7 +48,7 @@ def main() -> None:
 
     writer = writers['ffmpeg'](fps=15, metadata=dict(artist="Jawad"), bitrate=1800)
     ani = FuncAnimation(fig, update_quiver_frame, frames=process_particles(n, l, t, r, v, nu, kappa),
-                        fargs=(ax, l, r, v, nu, kappa), interval=30, save_count=int(100 * t * nu) + 1, repeat=False)
+                        fargs=(ax, l, r, v, nu, kappa), interval=30, repeat=False)
 
     if save:
         ani.save(file, writer=writer)
@@ -114,6 +115,8 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     Returns: A generator which yields a tuple of two Tensors for position and velocity.
 
     """
+    von_mises = VonMises(tensor(0, torch.float), tensor(kappa, torch.float))
+
     dt = 0.01 / nu
     max_iter = np.floor(t / dt).astype(int) * 5
     scaled_velocity = l * v
@@ -121,12 +124,11 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     pos = torch.mul(torch.rand(n, 2, device=gpu_cuda), l)
     vel = torch.mul(torch.rand(n, 1, device=gpu_cuda), 2 * np.pi)
 
-    # print(f"""Calculated Parameters:-
-    #     Time Discretisation Step: {dt}
-    #     Max Iteration: {max_iter}
-    #     Scaled Velocity of Particles: {scaled_velocity}
-    #     Scale: {scale}
-    #     Scaled Interaction Radius: {rr}""")
+    print(f"""Calculated Parameters:-
+        Time Discretisation Step: {dt}
+        Max Iteration: {max_iter}
+        Scaled Velocity of Particles: {scaled_velocity}
+        Scaled Interaction Radius: {rr}""")
 
     index = index_map(pos, rr)
     particle_map = fill_map(int(l / rr), index)
@@ -140,7 +142,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
 
         target = deepcopy(vel)
         target[condition] = average_orientation(pos, target, index[condition], particle_map, r)
-        vel[condition] = torch.remainder(target[condition] + von_mises_dist(0, kappa, torch.sum(who).item()), 2 * np.pi)
+        vel[condition] = torch.remainder(target[condition] + von_mises.sample((who.sum(), 1)), 2 * np.pi)
         pos = torch.remainder(pos + torch.mul(torch.cat((torch.cos(vel), torch.sin(vel)), 1), dt * scaled_velocity), l)
 
         if t % 10 == 0:
@@ -149,44 +151,6 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
 
         index = index_map(pos, rr)
         particle_map = fill_map(int(l / rr), index)
-
-
-def von_mises_dist(theta: float, kappa: float, n: int) -> Tensor:
-    """
-    Simulates 'n' random angles from a von Mises distribution, with preferred
-    direction 'theta' and concentration parameter 'kappa'.
-
-    Args:
-        theta: The mean angle, i.e. the preferred rotation.
-        kappa: The concentration of distribution (the higher the value, the
-            more concentrated the data is around 'theta').
-            [Note]: small kappa -> uniform distribution.
-        n: The number of random angles to generate.
-
-    Returns: A Tensor of size 'n' with random angle around 'theta'.
-
-    """
-    if kappa < 1e-6:
-        return torch.mul(torch.rand(n, 1, device=gpu_cuda), 2 * np.pi).sub(np.pi)
-
-    a = 1 + np.sqrt(1 + 4 * kappa ** 2)
-    b = (a - np.sqrt(2 * a)) / (2 * kappa)
-    r = (1 + b ** 2) / (2 * b)
-
-    alpha = torch.zeros(n, 1, device=gpu_cuda)
-    for j in range(n):
-        while True:
-            u = np.random.uniform(size=3)
-
-            z = np.cos(np.pi * u[0])
-            f = (1 + r * z) / (r + z)
-            c = kappa * (r - f)
-
-            if u[1] < c * (2 - c) or not (np.log(c) - np.log(u[1]) + 1 - c < 0):
-                break
-
-        alpha[j, 0] = tensor(theta + np.sign(u[2] - 0.5) * np.arccos(f), torch.float)
-    return alpha
 
 
 def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
@@ -296,12 +260,12 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
     parser = argparse.ArgumentParser(description="Depicting the movement of several particles in a 2D "
                                                  "space using a combination of CPU and GPU.")
 
-    parser.add_argument("-s", "--save", action="store_true", default=True, help="Save in a File or not.")
+    parser.add_argument("-s", "--save", action="store_true", default=False, help="Save in a File or not.")
     parser.add_argument("-f", "--video_file", type=str, default="quiver_efficient.mp4",
                         help="The Video File to Save in")
-    parser.add_argument("-n", "--agents_num", type=int, default=100000, help="The Number of Agents")
+    parser.add_argument("-n", "--agents_num", type=int, default=10000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
-    parser.add_argument("-t", "--max_iter", type=int, default=20, help="The Total Number of Iterations/Seconds")
+    parser.add_argument("-t", "--seconds", type=int, default=60, help="Simulation Length in Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
     parser.add_argument("-v", "--particle_velocity", type=float, default=0.02, help="The Velocity of the Particles")
     parser.add_argument("-nu", "--jump_rate", type=float, default=0.3, help="The Jump Rate")
@@ -309,7 +273,7 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
 
     args = parser.parse_args()
 
-    return args.save, args.video_file, args.agents_num, args.box_size, args.max_iter, \
+    return args.save, args.video_file, args.agents_num, args.box_size, args.seconds, \
            args.interact_radius, args.particle_velocity, args.jump_rate, args.concentration
 
 

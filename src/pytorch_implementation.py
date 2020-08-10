@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
 from matplotlib.axes import Axes
 from torch import Tensor
+from torch.distributions.von_mises import VonMises
 from typing import Any, Generator, List, Tuple
 
 np.set_printoptions(precision=4)
@@ -19,9 +20,11 @@ gpu_cuda = torch.device("cuda")
 def main():
     save, file, n, l, t, r, v, nu, kappa = parse_args()
     # print(f"""Hyperparameters:-
+    #     Save to File: {save}
+    #     Save File Name: {file}
     #     Number of Particles: {n}
     #     Periodic Spatial Domain: {l}
-    #     Total No. of Iterations: {t}
+    #     Simulation Length (in Seconds): {t}
     #     Interaction Radius: {r}
     #     Initial Particle velocity: {v}
     #     Jump Rate: {nu}
@@ -68,6 +71,8 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int,
 
 def process_particles(n: int, l: Tensor, t: Tensor, r: Tensor, v: Tensor, nu: Tensor, kappa: Tensor) -> \
         Generator[Tuple[Tensor, Tensor], None, None]:
+    von_mises = VonMises(tensor(0, torch.float), tensor(kappa, torch.float))
+
     dt = tensor(0.01, torch.float) / nu
     max_iter = torch.floor(t / dt).to(torch.int64).item() * 5
     scaled_velocity = l * v
@@ -79,12 +84,8 @@ def process_particles(n: int, l: Tensor, t: Tensor, r: Tensor, v: Tensor, nu: Te
     #     Time Discretisation Step: {dt}
     #     Max Iteration: {max_iter}
     #     Scaled Velocity of Particles: {scaled_velocity}
-    #     Scale: {scale}
-    #     Scaled Interaction Radius: {rr}
-    #     Positions of the Particles:
-    #     {pos}
-    #     Direction of the Motion of Particles:
-    #     {vel}""")
+    #     Scaled Interaction Radius: {rr}""")
+
     dim = torch.floor(l / rr).to(torch.int64).item()
 
     index = index_map(pos, rr)
@@ -97,9 +98,7 @@ def process_particles(n: int, l: Tensor, t: Tensor, r: Tensor, v: Tensor, nu: Te
 
         target = deepcopy(vel)
         target[condition] = average_orientation(pos, target, index[condition], particle_map, r)
-        vel[condition] = torch.remainder(target[condition] +
-                                            von_mises_dist(tensor(0, torch.float), kappa, torch.sum(who).item()),
-                                         tensor(2 * np.pi, torch.float))
+        vel[condition] = torch.remainder(target[condition] + von_mises.sample((torch.sum(who), 1)), 2 * np.pi)
         pos = torch.remainder(pos + dt * scaled_velocity * torch.cat((torch.cos(vel), torch.sin(vel)), 1), l)
 
         if t % 10 == 0:
@@ -108,34 +107,6 @@ def process_particles(n: int, l: Tensor, t: Tensor, r: Tensor, v: Tensor, nu: Te
 
         index = index_map(pos, rr)
         particle_map = fill_map(dim, index)
-
-
-def von_mises_dist(theta: Tensor, kappa: Tensor, n: int) -> Tensor:
-    pi = tensor(np.pi, torch.float)
-    tensors = [tensor(num, torch.int64) for num in range(5)]
-
-    if kappa < tensor(1e-6, torch.float):
-        return tensors[2] * pi * torch.rand(n, 1, device=gpu_cuda) - pi
-
-    a = tensors[1] + torch.sqrt(tensors[1] + tensors[4] * kappa ** tensors[2])
-    b = (a - torch.sqrt(tensors[2] * a)) / (tensors[2] * kappa)
-    r = (tensors[1] + b ** tensors[2]) / (tensors[2] * b)
-
-    alpha = torch.zeros(n, 1, device=gpu_cuda)
-    for j in range(n):
-        while True:
-            u = torch.rand(3, device=gpu_cuda)
-
-            z = torch.cos(pi * u[0])
-            f = (tensors[1] + r * z) / (r + z)
-            c = kappa * (r - f)
-
-            if u[1] < c * (tensors[2] - c) or not (torch.log(c) - torch.log(u[1]) + tensors[1] - c < tensors[0]):
-                break
-
-        alpha[j, 0] = torch.remainder(theta + torch.sign(u[2] - tensor(0.5, torch.float)) * torch.acos(f),
-                                      tensors[2] * pi)
-    return alpha
 
 
 def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
@@ -180,7 +151,7 @@ def parse_args() -> Tuple[bool, str, int, Tensor, Tensor, Tensor, Tensor, Tensor
     parser.add_argument("-f", "--video_file", type=str, default="quiver_pytorch.mp4", help="The Video File to Save in")
     parser.add_argument("-n", "--agents_num", type=int, default=5000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
-    parser.add_argument("-t", "--max_iter", type=int, default=50, help="The Total Number of Iterations/Seconds")
+    parser.add_argument("-t", "--seconds", type=int, default=60, help="Simulation Length in Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
     parser.add_argument("-v", "--particle_velocity", type=float, default=0.02, help="The Velocity of the Particles")
     parser.add_argument("-nu", "--jump_rate", type=float, default=0.3, help="The Jump Rate")
@@ -189,7 +160,7 @@ def parse_args() -> Tuple[bool, str, int, Tensor, Tensor, Tensor, Tensor, Tensor
     args = parser.parse_args()
 
     return args.save, args.video_file, args.agents_num, \
-           tensor(args.box_size, torch.int64), tensor(args.max_iter, torch.int64), \
+           tensor(args.box_size, torch.int64), tensor(args.seconds, torch.int64), \
            tensor(args.interact_radius, torch.float), tensor(args.particle_velocity, torch.float), \
            tensor(args.jump_rate, torch.float), tensor(args.concentration, torch.float)
 
