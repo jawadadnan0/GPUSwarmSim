@@ -1,5 +1,5 @@
 import argparse
-import numpy as np
+import math
 import torch
 
 from copy import deepcopy
@@ -10,7 +10,6 @@ from torch import Tensor
 from torch.distributions.von_mises import VonMises
 from typing import Any, Generator, List, Tuple
 
-np.set_printoptions(precision=4)
 if not torch.cuda.is_available():
     raise Exception("CUDA not available to be used for the program.")
 gpu_cuda = torch.device("cuda")
@@ -79,11 +78,11 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes3D, l: int,
 
     """
     ax.clear()
-    sep = l / 10
 
-    ax.set_xticks(np.arange(0, l + sep, sep))
-    ax.set_yticks(np.arange(0, l + sep, sep))
-    ax.set_zticks(np.arange(0, l + sep, sep))
+    ticks = 10
+    ax.set_xticks([value / ticks for value in range(ticks + 1)])
+    ax.set_yticks([value / ticks for value in range(ticks + 1)])
+    ax.set_zticks([value / ticks for value in range(ticks + 1)])
 
     ax.set_xlim(0, l)
     ax.set_ylim(0, l)
@@ -122,12 +121,12 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     von_mises = VonMises(tensor(0, torch.float), tensor(kappa, torch.float))
 
     dt = 0.01 / nu
-    max_iter = np.floor(t / dt).astype(int) * 5
+    max_iter = int(t / dt) * 5
     scaled_velocity = l * v
-    rr = l / np.floor(l / r)
+    rr = l / int(l / r)
     pos = torch.mul(torch.rand(n, 3, device=gpu_cuda), l)
-    vel = torch.cat((torch.mul(torch.rand(n, 1, device=gpu_cuda), 2 * np.pi),
-                     torch.mul(torch.rand(n, 1, device=gpu_cuda), np.pi)), 1)
+    vel = torch.cat((torch.mul(torch.rand(n, 1, device=gpu_cuda), 2 * math.pi),
+                     torch.mul(torch.rand(n, 1, device=gpu_cuda), math.pi)), 1)
 
     # print(f"""Calculated Parameters:-
     #     Time Discretisation Step: {dt}
@@ -148,8 +147,8 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
         target = deepcopy(vel)
         target[condition] = average_orientation(pos, target, index[condition], particle_map, r)
         vel[condition] = target[condition] + von_mises.sample((who.sum(), 2))
-        vel[:, 0][condition] = torch.remainder(vel[:, 0][condition], 2 * np.pi)
-        vel[:, 1][condition] = torch.remainder(vel[:, 1][condition], np.pi)
+        vel[:, 0][condition] = torch.remainder(vel[:, 0][condition], 2 * math.pi)
+        vel[:, 1][condition] = torch.remainder(vel[:, 1][condition], math.pi)
 
         x = torch.sin(vel[:, 1]) * torch.cos(vel[:, 0])
         y = torch.sin(vel[:, 1]) * torch.sin(vel[:, 0])

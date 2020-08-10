@@ -1,5 +1,5 @@
 import argparse
-import numpy as np
+import math
 import torch
 
 from copy import deepcopy
@@ -10,7 +10,6 @@ from torch import Tensor
 from torch.distributions.von_mises import VonMises
 from typing import Any, Generator, List, Tuple
 
-np.set_printoptions(precision=4)
 if not torch.cuda.is_available():
     raise Exception("CUDA not available to be used for the program.")
 gpu_cuda = torch.device("cuda")
@@ -78,10 +77,10 @@ def update_quiver_frame(frame_data: Tuple[Tensor, Tensor], ax: Axes, l: int,
 
     """
     ax.clear()
-    sep = l / 10
 
-    ax.set_xticks(np.arange(0, l + sep, sep))
-    ax.set_yticks(np.arange(0, l + sep, sep))
+    ticks = 10
+    ax.set_xticks([value / ticks for value in range(ticks + 1)])
+    ax.set_yticks([value / ticks for value in range(ticks + 1)])
 
     ax.set_xlim(0, l)
     ax.set_ylim(0, l)
@@ -122,7 +121,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     scaled_velocity = l * v
     rr = l / int(l / r)
     pos = torch.mul(torch.rand(n, 2, device=gpu_cuda), l)
-    vel = torch.mul(torch.rand(n, 1, device=gpu_cuda), 2 * np.pi)
+    vel = torch.mul(torch.rand(n, 1, device=gpu_cuda), 2 * math.pi)
 
     print(f"""Calculated Parameters:-
         Time Discretisation Step: {dt}
@@ -142,7 +141,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
 
         target = deepcopy(vel)
         target[condition] = average_orientation(pos, target, index[condition], particle_map, r)
-        vel[condition] = torch.remainder(target[condition] + von_mises.sample((who.sum(), 1)), 2 * np.pi)
+        vel[condition] = torch.remainder(target[condition] + von_mises.sample((who.sum(), 1)), 2 * math.pi)
         pos = torch.remainder(pos + torch.mul(torch.cat((torch.cos(vel), torch.sin(vel)), 1), dt * scaled_velocity), l)
 
         if t % 10 == 0:
