@@ -116,11 +116,13 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
 
     """
     von_mises = VonMises(tensor(0, torch.float), tensor(kappa, torch.float))
+    angles = von_mises.sample((n, 1))
+    print(angles)
 
     dt = 0.01 / nu
-    max_iter = np.floor(t / dt).astype(int) * 5
+    max_iter = int(t / dt) * 5
     scaled_velocity = l * v
-    rr = l / np.floor(l / r)
+    rr = l / int(l / r)
     pos = torch.mul(torch.rand(n, 2, device=gpu_cuda), l)
     vel = torch.mul(torch.rand(n, 1, device=gpu_cuda), 2 * np.pi)
 
@@ -208,7 +210,7 @@ def fill_map(size: int, index: Tensor) -> List[List[List[int]]]:
     """
     particle_map = [[[] for _ in range(size)] for _ in range(size)]
     for i in range(index.size()[0]):
-        particle_map[index[i, 1].item() % size][index[i, 2].item() % size].insert(0, index[i, 0].item())
+        particle_map[index[i, 1].item()][index[i, 2].item()].insert(0, index[i, 0].item())
     return particle_map
 
 
