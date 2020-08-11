@@ -107,6 +107,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     max_iter = int(t / dt) * 5
     scaled_velocity = l * v
     rr = l / int(l / r)
+    map_size = int(l / rr)
     pos = l * random.uniform(size=(n, 2))
     vel = 2 * np.pi * random.uniform(size=(n, 1))
 
@@ -114,10 +115,11 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
         Time Discretisation Step: {dt}
         Max Iteration: {max_iter}
         Scaled Velocity of Particles: {scaled_velocity}
-        Scaled Interaction Radius: {rr}""")
+        Scaled Interaction Radius: {rr}
+        Particle Map Size: {map_size}""")
 
     index = index_map(pos, rr)
-    particle_map = fill_map(int(l / rr), index)
+    particle_map = fill_map(map_size, index)
 
     for t in range(max_iter + 1):
         jump = random.uniform(size=(n, 1))
@@ -134,7 +136,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
             yield pos, vel
 
         index = index_map(pos, rr)
-        particle_map = fill_map(int(l / rr), index)
+        particle_map = fill_map(map_size, index)
 
 
 def average_orientation(pos: np.ndarray, vel: np.ndarray, index: np.ndarray,

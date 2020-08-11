@@ -120,6 +120,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     max_iter = int(t / dt) * 5
     scaled_velocity = l * v
     rr = l / int(l / r)
+    map_size = int(l / rr)
     pos = torch.mul(torch.rand(n, 2, device=gpu_cuda), l)
     vel = torch.mul(torch.rand(n, 1, device=gpu_cuda), 2 * math.pi)
 
@@ -127,10 +128,11 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
         Time Discretisation Step: {dt}
         Max Iteration: {max_iter}
         Scaled Velocity of Particles: {scaled_velocity}
-        Scaled Interaction Radius: {rr}""")
+        Scaled Interaction Radius: {rr}
+        Particle Map Size: {map_size}""")
 
     index = index_map(pos, rr)
-    particle_map = fill_map(int(l / rr), index)
+    particle_map = fill_map(map_size, index)
 
     for t in range(max_iter + 1):
         jump = torch.rand(n, 1, device=gpu_cuda)
@@ -149,7 +151,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
             yield pos, vel
 
         index = index_map(pos, rr)
-        particle_map = fill_map(int(l / rr), index)
+        particle_map = fill_map(map_size, index)
 
 
 def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
@@ -259,10 +261,10 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
     parser = argparse.ArgumentParser(description="Depicting the movement of several particles in a 2D "
                                                  "space using a combination of CPU and GPU.")
 
-    parser.add_argument("-s", "--save", action="store_true", default=False, help="Save in a File or not.")
+    parser.add_argument("-s", "--save", action="store_true", default=True, help="Save in a File or not.")
     parser.add_argument("-f", "--video_file", type=str, default="quiver_efficient.mp4",
                         help="The Video File to Save in")
-    parser.add_argument("-n", "--agents_num", type=int, default=10000, help="The Number of Agents")
+    parser.add_argument("-n", "--agents_num", type=int, default=100000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
     parser.add_argument("-t", "--seconds", type=int, default=60, help="Simulation Length in Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
