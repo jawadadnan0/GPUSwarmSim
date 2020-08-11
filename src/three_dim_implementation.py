@@ -28,16 +28,16 @@ def main() -> None:
 
     """
     save, file, n, l, t, r, v, nu, kappa = parse_args()
-    # print(f"""Hyperparameters:-
-    #     Save to File: {save}
-    #     Save File Name: {file}
-    #     Number of Particles: {n}
-    #     Periodic Spatial Domain: {l}
-    #     Simulation Length (in Seconds): {t}
-    #     Interaction Radius: {r}
-    #     Initial Particle velocity: {v}
-    #     Jump Rate: {nu}
-    #     Concentration Parameter: {kappa}""")
+    print(f"""Hyperparameters:-
+        Save to File: {save}
+        Save File Name: {file}
+        Number of Particles: {n}
+        Periodic Spatial Domain: {l}
+        Simulation Length (in Seconds): {t}
+        Interaction Radius: {r}
+        Initial Particle velocity: {v}
+        Jump Rate: {nu}
+        Concentration Parameter: {kappa}""")
 
     start = torch.cuda.Event(enable_timing=True)
     end = torch.cuda.Event(enable_timing=True)
@@ -55,6 +55,8 @@ def main() -> None:
         torch.cuda.synchronize()
         print("[100% Complete] Time taken:", start.elapsed_time(end) // 1000, "seconds")
     else:
+        mng = plt.get_current_fig_manager()
+        mng.window.state("zoomed")
         plt.show()
 
 
@@ -123,18 +125,20 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
     max_iter = int(t / dt) * 5
     scaled_velocity = l * v
     rr = l / int(l / r)
+    map_size = int(l / rr)
     pos = torch.mul(torch.rand(n, 3, device=gpu_cuda), l)
     vel = torch.cat((torch.mul(torch.rand(n, 1, device=gpu_cuda), 2 * math.pi),
                      torch.mul(torch.rand(n, 1, device=gpu_cuda), math.pi)), 1)
 
-    # print(f"""Calculated Parameters:-
-    #     Time Discretisation Step: {dt}
-    #     Max Iteration: {max_iter}
-    #     Scaled Velocity of Particles: {scaled_velocity}
-    #     Scaled Interaction Radius: {rr}""")
+    print(f"""Calculated Parameters:-
+            Time Discretisation Step: {dt}
+            Max Iteration: {max_iter}
+            Scaled Velocity of Particles: {scaled_velocity}
+            Adjusted Interaction Radius: {rr}
+            Particle Map Size: {map_size}""")
 
     index = index_map(pos, rr)
-    particle_map = fill_map(int(l / rr), index)
+    particle_map = fill_map(map_size, index)
 
     for t in range(max_iter + 1):
         jump = torch.rand(n, 1, device=gpu_cuda)
@@ -161,7 +165,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
             yield pos, vel
 
         index = index_map(pos, rr)
-        particle_map = fill_map(int(l / rr), index)
+        particle_map = fill_map(map_size, index)
 
 
 def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,
@@ -247,7 +251,7 @@ def index_map(pos: Tensor, r: float) -> Tensor:
 
     """
     indexes = torch.arange(pos.size()[0], device=gpu_cuda).reshape(pos.size()[0], 1)
-    return torch.cat((indexes, torch.floor(torch.div(pos, r)).to(torch.int64)), 1)
+    return torch.cat((indexes, torch.div(pos, r).to(torch.int64)), 1)
 
 
 def tensor(value: Any, data_type: Any) -> Tensor:

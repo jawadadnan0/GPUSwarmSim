@@ -46,6 +46,8 @@ def main():
         torch.cuda.synchronize()
         print("[100% Complete] Time taken:", start.elapsed_time(end) // 1000, "seconds")
     else:
+        mng = plt.get_current_fig_manager()
+        mng.window.state("zoomed")
         plt.show()
 
 
@@ -77,19 +79,19 @@ def process_particles(n: int, l: Tensor, t: Tensor, r: Tensor, v: Tensor, nu: Te
     max_iter = torch.floor(t / dt).to(torch.int64).item() * 5
     scaled_velocity = l * v
     rr = l / torch.floor(l / r)
+    map_size = torch.floor(l / rr).to(torch.int64).item()
     pos = l * torch.rand(n, 2, device=gpu_cuda)
     vel = 2 * math.pi * torch.rand(n, 1, device=gpu_cuda)
 
-    # print(f"""Calculated Parameters:-
-    #     Time Discretisation Step: {dt}
-    #     Max Iteration: {max_iter}
-    #     Scaled Velocity of Particles: {scaled_velocity}
-    #     Scaled Interaction Radius: {rr}""")
-
-    dim = torch.floor(l / rr).to(torch.int64).item()
+    print(f"""Calculated Parameters:-
+        Time Discretisation Step: {dt}
+        Max Iteration: {max_iter}
+        Scaled Velocity of Particles: {scaled_velocity}
+        Adjusted Interaction Radius: {rr}
+        Particle Map Size: {map_size}""")
 
     index = index_map(pos, rr)
-    particle_map = fill_map(dim, index)
+    particle_map = fill_map(map_size, index)
 
     for t in range(max_iter):
         jump = torch.rand(n, 1, device=gpu_cuda)
@@ -106,7 +108,7 @@ def process_particles(n: int, l: Tensor, t: Tensor, r: Tensor, v: Tensor, nu: Te
             yield pos, vel
 
         index = index_map(pos, rr)
-        particle_map = fill_map(dim, index)
+        particle_map = fill_map(map_size, index)
 
 
 def average_orientation(pos: Tensor, vel: Tensor, index: Tensor,

@@ -55,6 +55,8 @@ def main() -> None:
         torch.cuda.synchronize()
         print("[100% Complete] Time taken:", start.elapsed_time(end) // 1000, "seconds")
     else:
+        mng = plt.get_current_fig_manager()
+        mng.window.state("zoomed")
         plt.show()
 
 
@@ -128,7 +130,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
         Time Discretisation Step: {dt}
         Max Iteration: {max_iter}
         Scaled Velocity of Particles: {scaled_velocity}
-        Scaled Interaction Radius: {rr}
+        Adjusted Interaction Radius: {rr}
         Particle Map Size: {map_size}""")
 
     index = index_map(pos, rr)
@@ -150,6 +152,7 @@ def process_particles(n: int, l: int, t: int, r: float, v: float, nu: float, kap
             print(f"Iteration number: {t} (out of {max_iter} iterations) [{(100 * t) // max_iter}% complete]")
             yield pos, vel
 
+        del index, particle_map
         index = index_map(pos, rr)
         particle_map = fill_map(map_size, index)
 
@@ -229,7 +232,7 @@ def index_map(pos: Tensor, r: float) -> Tensor:
 
     """
     indexes = torch.arange(pos.size()[0], device=gpu_cuda).reshape(pos.size()[0], 1)
-    return torch.cat((indexes, torch.floor(torch.div(pos, r)).to(torch.int64)), 1)
+    return torch.cat((indexes, torch.div(pos, r).to(torch.int64)), 1)
 
 
 def tensor(value: Any, data_type: Any) -> Tensor:
@@ -264,7 +267,7 @@ def parse_args() -> Tuple[bool, str, int, int, int, float, float, float, float]:
     parser.add_argument("-s", "--save", action="store_true", default=True, help="Save in a File or not.")
     parser.add_argument("-f", "--video_file", type=str, default="quiver_efficient.mp4",
                         help="The Video File to Save in")
-    parser.add_argument("-n", "--agents_num", type=int, default=100000, help="The Number of Agents")
+    parser.add_argument("-n", "--agents_num", type=int, default=10000, help="The Number of Agents")
     parser.add_argument("-l", "--box_size", type=int, default=1, help="The Size of the Box (Periodic Spatial Domain)")
     parser.add_argument("-t", "--seconds", type=int, default=60, help="Simulation Length in Seconds")
     parser.add_argument("-r", "--interact_radius", type=float, default=0.07, help="The Radius of Interaction")
